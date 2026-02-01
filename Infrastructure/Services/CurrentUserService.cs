@@ -19,8 +19,8 @@ namespace MIO.Infrastructure.Services
             
         }
 
-        public int UserId { get; }
-        public string UserName { get; }
-        public string Role { get; }
+        public  int UserId { get; }
+        public string? UserName { get; }
+        public string? Role { get; }
     }
 }

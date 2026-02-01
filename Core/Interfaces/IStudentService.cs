@@ -6,7 +6,7 @@ namespace MIO.Core.Interfaces
 {
     public interface IStudentService
     {
-        Task CreateStudent(CreateStudentDTO studentDTO);
+        Task<Student?> CreateStudent(CreateStudentDTO studentDTO);
         Task<StudentResponseDTO?> GetStudentByIDService(int studentId);
         Task<IEnumerable<StudentResponseDTO>> GetStudentsService();
         Task<Student?> UpdateStudentService(int id, UpdateStudentDTO studentDTO);

@@ -5,6 +5,8 @@ using MIO.Core.DTOs.StudentDtos;
 using MIO.Core.DTOs.UserDtos;
 using MIO.Core.Entities;
 using MIO.Core.Interfaces;
+using MIO2.Core.Events.EventBus;
+using MIO2.Core.Events.Students;
 
 namespace MIO.Infrastructure.Services
 {
@@ -17,7 +19,7 @@ namespace MIO.Infrastructure.Services
             _dbContext = dbContext;
         }
 
-        public async Task CreateStudent(CreateStudentDTO studentDTO)
+        public async Task<Student?> CreateStudent(CreateStudentDTO studentDTO)
         {
            
             if (!await _dbContext.Users.AnyAsync(u => u.Id == studentDTO.UserId))
@@ -49,6 +51,7 @@ namespace MIO.Infrastructure.Services
 
             _dbContext.Students.Add(student);
             await _dbContext.SaveChangesAsync();
+            return student;
         }
 
         public async Task<StudentResponseDTO?> GetStudentByIDService(int studentId)
@@ -232,6 +235,17 @@ namespace MIO.Infrastructure.Services
 
             student.IsAccepted = true;
             await _dbContext.SaveChangesAsync();
+
+             await studentEvents.RaiseAccepted
+                (
+                    new StudentAcceptedEvent
+                    (
+                     student.Id,
+                     student.User.Email,
+                     student.User.FirstName
+                    )
+                );
+
 
             return  new StudentResponseDTO
             {

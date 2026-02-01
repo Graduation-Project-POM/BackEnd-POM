@@ -6,7 +6,7 @@ namespace MIO.Core.Interfaces
 {
     public interface ITrainerService
     {
-       Task CreateTrainer(CreateTrainerDTO trainerDTO);
+       Task<Trainer?> CreateTrainer(CreateTrainerDTO trainerDTO);
 
        Task<TrainerResponseDTO?> GetTrainerByIDService(int TrainerId);
 

@@ -6,6 +6,11 @@ using MIO.API.Settings;
 using MIO.Core.Interfaces;
 using MIO.Infrastructure;
 using MIO.Infrastructure.Services;
+using MIO2.API.Settings;
+using MIO2.Core.Events.EventBus;
+using MIO2.Core.Interfaces;
+using MIO2.Infrastructure.Events;
+using MIO2.Infrastructure.Services;
 using System;
 using System.Text;
 
@@ -25,19 +30,28 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>();
 var emailSettings = builder.Configuration.GetSection("Email").Get<EmailSettings>();
+var s3Settings= builder.Configuration.GetSection("AWS").Get<S3Settings>();
+
+//builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
+
+//builder.Services.Configure<S3Settings>(builder.Configuration.GetSection("Email"));
+
+//builder.Services.Configure<S3Settings>(builder.Configuration.GetSection("AWS"));
 
 //services
 builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddSingleton(jwtOptions);
 builder.Services.AddSingleton(emailSettings);
+builder.Services.AddSingleton(s3Settings);
 builder.Services.AddScoped<IUserService, UserServices>();
 builder.Services.AddScoped<ITrainerService, TrainerServices>();
 builder.Services.AddScoped<IStudentService, StudentServices>();
 builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<EmailService>();
-
-
+builder.Services.AddScoped<StudentAcceptedEmailHandler>();
+builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<IS3Service, S3Service>();
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -66,9 +80,17 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+using (var scope = app.Services.CreateScope())
+{
+    var emailHandler = scope.ServiceProvider
+        .GetRequiredService<StudentAcceptedEmailHandler>();
+
+    studentEvents.Accepted += emailHandler.Handle;
+}
 
 
-app.UseHttpsRedirection();
+
+    app.UseHttpsRedirection();
 
 app.UseAuthentication();
 app.UseAuthorization();

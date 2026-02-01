@@ -1,0 +1,14 @@
+# Visual Studio
+.vs/
+bin/
+obj/
+
+# User-specific
+*.user
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

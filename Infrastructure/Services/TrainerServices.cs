@@ -12,7 +12,7 @@ namespace MIO.Infrastructure.Services
     public class TrainerServices(AppDbContext _dbContext) : ITrainerService
     {
 
-        public async Task CreateTrainer(CreateTrainerDTO trainerDTO)
+        public async Task<Trainer?> CreateTrainer(CreateTrainerDTO trainerDTO)
         {
 
             if(!await _dbContext.Users.AnyAsync(u=>u.Id==trainerDTO.userId))
@@ -41,6 +41,7 @@ namespace MIO.Infrastructure.Services
 
             await _dbContext.SaveChangesAsync();
 
+            return trainer;
         }
 
         public async Task<TrainerResponseDTO?> GetTrainerByIDService(int TrainerId)

@@ -1,0 +1,28 @@
+﻿using Microsoft.EntityFrameworkCore;
+using MIO.Core.Entities;
+using MIO2.Core.Entities;
+
+
+namespace MIO.Infrastructure
+{
+    public class AppDbContext : DbContext
+    {
+        public AppDbContext(DbContextOptions<AppDbContext> options)
+            : base(options)
+        {
+        }
+
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            modelBuilder.ApplyConfigurationsFromAssembly(typeof(AppDbContext).Assembly);    
+        }
+
+        public DbSet<User> Users { get; set; }
+        public DbSet<Trainer> Trainers { get; set; }
+        public DbSet<Student> Students { get; set; }
+        public DbSet<Gallery> Gallery { get; set; }
+        //راح اضيف الجداول بس لما نتفق عليهم ان شاء الله 
+
+    }
+}

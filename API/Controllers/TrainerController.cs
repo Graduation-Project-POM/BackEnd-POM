@@ -20,10 +20,14 @@ namespace MIO.API.Controllers
         public async Task<ActionResult> createTrainer(CreateTrainerDTO trainerDTO)
         {
           
-                await trainerService.CreateTrainer(trainerDTO);
-                return Ok("Trainer Created successfully");
-            
-            
+             var trainer= await trainerService.CreateTrainer(trainerDTO);
+
+            return new OkObjectResult(new
+            {
+                message = "User Created successfully",
+                userId = trainer.Id
+            });
+
         }
 
         [HttpGet]

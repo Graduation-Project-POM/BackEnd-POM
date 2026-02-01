@@ -10,7 +10,7 @@ namespace MIO.API.Controllers
 {
     [ApiController]
     [Route("[Controller]")]
-    [Authorize]
+    [Authorize] 
     public class StudentController : ControllerBase
     {
         private readonly IStudentService _studentService;
@@ -22,13 +22,18 @@ namespace MIO.API.Controllers
             _emailService = emailService;
         }
 
-        [HttpPost]
-        [Route("")]
-        public async Task<ActionResult> CreateStudent(CreateStudentDTO studentDTO)
-        {
-            await _studentService.CreateStudent(studentDTO);
-            return Ok("Student created successfully");
-        }
+            [HttpPost]
+            [Route("")]
+            public async Task<ActionResult> CreateStudent(CreateStudentDTO studentDTO)
+            {
+              var student=  await _studentService.CreateStudent(studentDTO);
+                return new OkObjectResult(new
+                {
+                    message = "Student Created successfully",
+                    userId = student.Id
+                });
+           
+            }
 
         [HttpGet]
         [Route("")]
@@ -121,11 +126,7 @@ namespace MIO.API.Controllers
             if (acceptedStudent == null)
                 return NotFound($"Student with ID {id} not found");
 
-            var subject = _emailService.AcceptedInMIOSubject();
-            var body = _emailService.AcceptedInMIOBody(acceptedStudent.BasicUser.FirstName);
-
-            await _emailService.SendEmailAsync(acceptedStudent.BasicUser.Email,
-                subject, body);
+           
 
             return Ok(new
             {
