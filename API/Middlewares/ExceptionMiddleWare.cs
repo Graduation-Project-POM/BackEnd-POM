@@ -18,6 +18,7 @@ namespace MIO.API.Middlewares
         {
             try
             {
+                
                 await _next(context);
             }
             catch (Exception ex)

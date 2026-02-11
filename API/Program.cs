@@ -80,6 +80,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+
+
 using (var scope = app.Services.CreateScope())
 {
     var emailHandler = scope.ServiceProvider
@@ -89,14 +91,18 @@ using (var scope = app.Services.CreateScope())
 }
 
 
+app.UseMiddleware<ExceptionMiddleWare>();
 
-    app.UseHttpsRedirection();
+app.UseHttpsRedirection();
+  
 
 app.UseAuthentication();
 app.UseAuthorization();
 
+
+
 app.MapControllers();
 
-app.UseMiddleware<ExceptionMiddleWare>();
+
 
 app.Run();

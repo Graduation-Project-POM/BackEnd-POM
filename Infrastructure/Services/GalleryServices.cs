@@ -26,17 +26,28 @@ namespace MIO2.Infrastructure.Services
 
        
 
-        public async Task<Gallery> UploadPicToGallery(CreateGalleryDTO galleryDTO, string url,
-            string fileKey)
+        public async Task<Gallery> UploadMediaToGallery(CreateGalleryDTO galleryDTO, string url)
         {
-          
+            char Type;
+            
+            if (galleryDTO.FileKey.StartsWith("images/", StringComparison.OrdinalIgnoreCase))
+                Type = 'I';
+            else if (galleryDTO.FileKey.StartsWith("videos/",StringComparison.OrdinalIgnoreCase))
+                Type = 'V';
+            else
+            {
+                throw new AppException(
+                    "This content type is not supported.",
+                    StatusCodes.Status400BadRequest);
+            }
+            
 
-            var Image = new Gallery
+            var Media = new Gallery
             {
             Url= url,
-            FileKey=fileKey,
+            FileKey=galleryDTO.FileKey,
             Title= galleryDTO.Title,
-            Type= galleryDTO.Type,
+            Type= Type,
             Description= galleryDTO.Description,
             UploadedByID= _currentUser.UserId,
             RefType=galleryDTO.RefType,
@@ -46,31 +57,51 @@ namespace MIO2.Infrastructure.Services
 
 
 
-            _dbContext.Gallery.Add(Image);
+            _dbContext.Gallery.Add(Media);
             await _dbContext.SaveChangesAsync();
-            return Image;
+            return Media;
 
 
         }
 
 
-        public async Task<string> GetPicFromGallery(int ImageId)
+        public async Task<Gallery> GetMediaFromGallery(int MediaId)
         {
 
-            var Image=await _dbContext.Gallery.FindAsync(ImageId);
+            var Media=await _dbContext.Gallery.FindAsync(MediaId);
 
-            if (Image == null)
+            if (Media == null || Media.IsDeleted)
                 throw new AppException(
-                        $"Image with ID {ImageId} not found",
+                        $"Media with ID {MediaId} not found",
                         StatusCodes.Status404NotFound);
 
 
-            return Image.Url;
+            return Media;
 
 
         }
 
+        public async Task<Gallery> DeleteMediaFromGallery(int MediaId)
+        {
+            
+            var Media=await _dbContext.Gallery.FindAsync(MediaId);
 
+            if (Media == null)
+                throw new AppException(
+                    $"Media with ID {MediaId} not found",
+                    StatusCodes.Status404NotFound);
+            
+            Media.IsDeleted = true;
+            
+            _dbContext.Set<Gallery>().Remove(Media);
+
+            await _dbContext.SaveChangesAsync();
+
+            return Media;
+            
+            
+            
+        }
        
     }
 }

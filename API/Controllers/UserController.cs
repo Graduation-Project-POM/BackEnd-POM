@@ -47,6 +47,7 @@ namespace MIO.API.Controllers
 
         [HttpPost]
         [Route("")]
+        
         public async Task<ActionResult> createUser(CreateUserDTO userDTO)
         {  
               var user=  await userServices.CreateUser(userDTO);
@@ -75,7 +76,7 @@ namespace MIO.API.Controllers
 
         public async Task<ActionResult> GetUserById(int id)
         {
-           
+          
 
             var  user= await userServices.GetUserByIDService(id);
 

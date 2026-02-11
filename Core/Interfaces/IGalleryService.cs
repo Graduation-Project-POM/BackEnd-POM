@@ -6,8 +6,10 @@ namespace MIO2.Core.Interfaces
     public interface IGalleryService
     {
 
-        Task<Gallery> UploadPicToGallery(CreateGalleryDTO galleryDTO,string url,string fileKey);
+        Task<Gallery> UploadMediaToGallery(CreateGalleryDTO galleryDTO,string url);
 
-        Task<string> GetPicFromGallery(int ImageId);
+        Task<Gallery> GetMediaFromGallery(int MediaId);
+
+        Task<Gallery> DeleteMediaFromGallery(int MediaId);
     }
 }
