@@ -22,7 +22,7 @@ namespace MIO.Core.DTOs.UserDtos
             [Phone]
             public required string PhoneNumber { get; set; }
             [Required]
-            [RegularExpression("male|female", ErrorMessage = "Gender must be Male or Female")]
+            [RegularExpression("male|female", ErrorMessage = "Gender must be male or female")]
             public required string Gender { get; set; }
 
             public string ProfileImageUrl { get; set; }

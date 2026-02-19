@@ -27,10 +27,13 @@ namespace MIO.API.Controllers
         public async Task<ActionResult<AuthResponseDTO>>AuthenticateUser([FromBody]AuthenticationRequest? request)
         {
 
-            if(request == null) 
+            if (request == null ||
+                string.IsNullOrWhiteSpace(request.UserName) ||
+                string.IsNullOrWhiteSpace(request.Password))
             {
-                    return BadRequest("Please enter your login data");
+                return BadRequest("Please enter your login data");
             }
+
 
            var user= await userServices.GetUserService(request);
 
@@ -47,10 +50,11 @@ namespace MIO.API.Controllers
 
         [HttpPost]
         [Route("")]
-        
+        [Authorize(Roles ="Admin")]
         public async Task<ActionResult> createUser(CreateUserDTO userDTO)
         {  
               var user=  await userServices.CreateUser(userDTO);
+              
                 return new OkObjectResult(new
                 {
                     message = "User Created successfully",
@@ -60,12 +64,9 @@ namespace MIO.API.Controllers
 
         [HttpGet]
         [Route("")]
-       
+        [Authorize(Roles ="Admin")]
         public async Task<ActionResult<IEnumerable<User>>> GetUsers()
         {
-          
-
-
             var records = await userServices.GetUsersService();
             return Ok(records);
         }
@@ -73,20 +74,16 @@ namespace MIO.API.Controllers
 
         [HttpGet]
         [Route("{id}")]
-
+        [Authorize(Roles ="Admin")]
         public async Task<ActionResult> GetUserById(int id)
         {
-          
-
-            var  user= await userServices.GetUserByIDService(id);
-
-          
+            var  user= await userServices.GetUserByIDService(id);   
             return Ok(user);
         }
 
         [HttpPut]
         [Route("{id}")]
-
+        [Authorize(Roles ="Admin")]
         public async Task<ActionResult> UpdateUser(int id, UpdateUserDTO userDTO)
         {
 
@@ -97,7 +94,7 @@ namespace MIO.API.Controllers
                 return new BadRequestObjectResult("Invalid user ID");
 
             
-                var updatedUser = await userServices.UpdateUserService(id, userDTO);
+            var updatedUser = await userServices.UpdateUserService(id, userDTO);
 
                 if (updatedUser == null)
                     return NotFound($"User with ID {id} not found");
@@ -112,7 +109,7 @@ namespace MIO.API.Controllers
 
         [HttpDelete]
         [Route("{id}")]
-
+        [Authorize(Roles ="Admin")]
         public async Task<ActionResult> DeleteUser(int id)
         {
 

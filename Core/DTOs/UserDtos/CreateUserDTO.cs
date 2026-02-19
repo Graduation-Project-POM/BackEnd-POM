@@ -6,7 +6,7 @@ namespace MIO.Core.DTOs.UserDtos
     public class CreateUserDTO
     {
             [Required]
-            [MinLength(2)]
+            [MinLength(2)] 
             public required string FirstName { get; set; }
 
             public string? MiddleName { get; set; }

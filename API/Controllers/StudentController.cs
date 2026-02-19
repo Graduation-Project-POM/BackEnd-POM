@@ -24,6 +24,7 @@ namespace MIO.API.Controllers
 
             [HttpPost]
             [Route("")]
+            [Authorize(Roles ="Admin")]
             public async Task<ActionResult> CreateStudent(CreateStudentDTO studentDTO)
             {
               var student=  await _studentService.CreateStudent(studentDTO);
@@ -37,6 +38,7 @@ namespace MIO.API.Controllers
 
         [HttpGet]
         [Route("")]
+        [Authorize(Roles ="Admin")]
         public async Task<ActionResult<IEnumerable<StudentResponseDTO>>> GetStudents()
         {
             var records = await _studentService.GetStudentsService();
@@ -45,6 +47,7 @@ namespace MIO.API.Controllers
 
         [HttpGet]
         [Route("{id}")]
+        [Authorize(Roles ="Admin,Trainer")]
         public async Task<ActionResult> GetStudentById(int id)
         {
             var student = await _studentService.GetStudentByIDService(id);
@@ -53,6 +56,7 @@ namespace MIO.API.Controllers
 
         [HttpPut]
         [Route("{id}")]
+        [Authorize(Roles ="Admin")]
         public async Task<ActionResult> UpdateStudent(int id, UpdateStudentDTO studentDTO)
         {
             if (studentDTO == null)
@@ -75,6 +79,7 @@ namespace MIO.API.Controllers
 
         [HttpDelete]
         [Route("{id}")]
+        [Authorize(Roles ="Admin")]
         public async Task<ActionResult> DeleteStudent(int id)
         {
             if (id <= 0)
@@ -97,6 +102,7 @@ namespace MIO.API.Controllers
 
         [HttpGet]
         [Route("accepted")]
+        [Authorize(Roles ="Admin,Trainer")]
         public async Task<ActionResult<IEnumerable<StudentResponseDTO>>> GetAcceptedStudents()
         {
             var acceptedStudents = await _studentService.GetAcceptedStudentsService();
@@ -105,6 +111,7 @@ namespace MIO.API.Controllers
 
         [HttpGet]
         [Route("city/{city}")]
+        [Authorize(Roles ="Admin,Trainer")]
         public async Task<ActionResult<IEnumerable<StudentResponseDTO>>> GetStudentsByCity(string city)
         {
             if (string.IsNullOrWhiteSpace(city))
@@ -116,6 +123,7 @@ namespace MIO.API.Controllers
 
         [HttpPatch]
         [Route("{id}/accept")]
+        [Authorize(Roles ="Admin")]
         public async Task<ActionResult> AcceptStudent(int id)
         {
             if (id <= 0)

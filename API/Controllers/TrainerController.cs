@@ -17,6 +17,7 @@ namespace MIO.API.Controllers
     {
         [HttpPost]
         [Route("")]
+        [Authorize(Roles ="Admin")]
         public async Task<ActionResult> createTrainer(CreateTrainerDTO trainerDTO)
         {
           
@@ -32,7 +33,7 @@ namespace MIO.API.Controllers
 
         [HttpGet]
         [Route("")]
-
+        [Authorize(Roles ="Admin")]
         public async Task<ActionResult<IEnumerable<TrainerResponseDTO>>> GetTrainers()
         {
             var records = await trainerService.GetTrainersService();
@@ -42,7 +43,7 @@ namespace MIO.API.Controllers
 
         [HttpGet]
         [Route("{id}")]
-
+        [Authorize(Roles ="Admin")]
         public async Task<ActionResult> GetTrainerById(int id)
         {
             var user = await trainerService.GetTrainerByIDService(id);
@@ -53,7 +54,7 @@ namespace MIO.API.Controllers
 
         [HttpPut]
         [Route("{id}")]
-
+        [Authorize(Roles ="Admin")]
         public async Task<ActionResult> UpdateTrainer(int id, UpdateTrainerDTO trainerDTO)
         {
 
@@ -82,7 +83,7 @@ namespace MIO.API.Controllers
 
         [HttpDelete]
         [Route("{id}")]
-
+        [Authorize(Roles ="Admin")]
         public async Task<ActionResult> DeleteTrainer(int id)
         {
             if (id <= 0)

@@ -73,7 +73,6 @@ namespace MIO.Infrastructure.Services
         public async Task<User?> GetUserService(AuthenticationRequest request)
         {
             
-
             var user=await _dbContext.Users.FirstOrDefaultAsync(u => u.UserName == request.UserName);
 
             if (user == null)
