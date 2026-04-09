@@ -52,6 +52,7 @@ builder.Services.AddScoped<EmailService>();
 builder.Services.AddScoped<StudentAcceptedEmailHandler>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IS3Service, S3Service>();
+builder.Services.AddScoped<IProblemServices, ProblemService>();
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>

@@ -33,8 +33,7 @@ namespace MIO2.Infrastructure.Services
         }
         
         
-        public (string fileKey,string preSignedUrl) CreateUploadURL(string fileName,
-            string contentType)
+        public (string fileKey,string preSignedUrl) CreateUploadURL(string fileName, string contentType)
         {
             if (String.IsNullOrWhiteSpace(fileName))
                 throw new ArgumentException("FileName is required.");

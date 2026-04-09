@@ -1,0 +1,13 @@
+using MIO.Core.Enums;
+
+namespace MIO.Core.DTOs.ProblemDTOs;
+
+public class ProblemResponseDTO
+{
+    public int ID { get; set; }
+    public string Title { get; set; }
+    public Difficulty Difficulty { get; set; }
+    public string Topic { get; set; }
+    public string? PhotoUrl { get; set; }
+    public bool IsPublished { get; set; }
+}
