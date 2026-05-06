@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations.Schema;
+using MIO2.Core.Entities;
 
 namespace MIO.Core.Entities
 {
@@ -10,6 +11,6 @@ namespace MIO.Core.Entities
         public int UserId { get; set; }
         public User User { get; set; }
 
-
+        public ICollection<Contest> Contests { get; set; } = [];
     }
 }

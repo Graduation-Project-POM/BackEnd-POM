@@ -5,6 +5,7 @@ using MIO.Core.DTOs.StudentDtos;
 using MIO.Core.Entities;
 using MIO.Core.Interfaces;
 using MIO.Infrastructure.Services;
+using MIO2.Core.DTOs.StudentDtos;
 
 namespace MIO.API.Controllers
 {
@@ -47,13 +48,20 @@ namespace MIO.API.Controllers
 
         [HttpGet]
         [Route("{id}")]
-        [Authorize(Roles ="Admin,Trainer")]
+        [Authorize(Roles ="Admin,Trainer,Student")]
         public async Task<ActionResult> GetStudentById(int id)
         {
             var student = await _studentService.GetStudentByIDService(id);
             return Ok(student);
         }
 
+        [HttpPost("batch")]
+        public async Task<IActionResult> GetMultipleStudents([FromBody] GetMultipleStudentsDTO dto)
+        {
+            var result = await _studentService.GetMultipleStudentsService(dto.Ids);
+            return Ok(result);
+        }
+        
         [HttpPut]
         [Route("{id}")]
         [Authorize(Roles ="Admin")]

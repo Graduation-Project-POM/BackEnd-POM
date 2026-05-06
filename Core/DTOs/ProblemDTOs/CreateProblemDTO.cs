@@ -11,7 +11,7 @@ public class CreateProblemDto
 
     
     
-    [Required, MaxLength(50)]
+    [Required]
     public Difficulty Difficulty { get; set; }
 
     [Required, MaxLength(255)]
@@ -19,8 +19,8 @@ public class CreateProblemDto
 
     public string Solution { get; set; }
     
-    [Url, MaxLength(500)]
-    public string PhotoFileKey { get; set; }
+    [ MaxLength(500)]
+    public string? PhotoFileKey { get; set; }
 
     
     public int TrainerID { get; set; }

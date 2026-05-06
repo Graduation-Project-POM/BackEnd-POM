@@ -1,6 +1,7 @@
 ﻿using MIO.Core.DTOs.StudentDTO;
 using MIO.Core.DTOs.StudentDtos;
 using MIO.Core.Entities;
+using MIO2.Core.DTOs.StudentDtos;
 
 namespace MIO.Core.Interfaces
 {
@@ -9,6 +10,7 @@ namespace MIO.Core.Interfaces
         Task<Student?> CreateStudent(CreateStudentDTO studentDTO);
         Task<StudentResponseDTO?> GetStudentByIDService(int studentId);
         Task<IEnumerable<StudentResponseDTO>> GetStudentsService();
+        Task<MultipleStudentsResponseDTO> GetMultipleStudentsService(IEnumerable<int> ids);
         Task<Student?> UpdateStudentService(int id, UpdateStudentDTO studentDTO);
         Task<Student?> DeleteStudentService(int id);
 

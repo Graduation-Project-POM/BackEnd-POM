@@ -3,6 +3,7 @@ using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using MIO.Core.Entities;
 using MIO.Core.Enums;
+using MIO2.Core.Entities;
 
 public class Problem
 {
@@ -22,7 +23,7 @@ public class Problem
     
 
     [MaxLength(500)]
-    public string PhotoFileKey { get; set; }
+    public string? PhotoFileKey { get; set; }
     [Required]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     [Required]
@@ -35,4 +36,6 @@ public class Problem
 
     [ForeignKey(nameof(TrainerID))]
     public Trainer Trainer { get; set; }
+    
+    public ICollection<Contest> Contests { get; set; } = [];
 }

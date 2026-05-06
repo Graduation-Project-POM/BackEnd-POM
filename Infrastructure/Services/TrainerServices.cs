@@ -5,29 +5,37 @@ using MIO.API.Settings;
 using MIO.Core.DTOs.TrainerDtos;
 using MIO.Core.DTOs.UserDtos;
 using MIO.Core.Entities;
+using MIO.Core.Enums;
 using MIO.Core.Interfaces;
 using MIO.Infrastructure.Services;
 namespace MIO.Infrastructure.Services
 {
-    public class TrainerServices(AppDbContext _dbContext) : ITrainerService
+    public class TrainerServices(AppDbContext _dbContext,ICurrentUserService _currentUser) : ITrainerService
     {
 
         public async Task<Trainer?> CreateTrainer(CreateTrainerDTO trainerDTO)
         {
-
-            if(!await _dbContext.Users.AnyAsync(u=>u.Id==trainerDTO.userId))
+        var user=await _dbContext.Users.FirstOrDefaultAsync(u=>u.Id==trainerDTO.userId);
+            
+            if(user is null)
             {
                 throw new AppException("there is no user with the id you've enterd, please create a new user or use another user id"
                     ,StatusCodes.Status404NotFound);
             }
-
+            
             if (await _dbContext.Trainers.AnyAsync(t => t.UserId == trainerDTO.userId))
             {
                 throw new AppException("this user is already a trainer, choose another user id"
                     ,StatusCodes.Status409Conflict);
             }
 
-            //if we need a role verification
+                if (user.RoleID != Role.Trainer)
+                {
+                    throw new AppException("this user is not a trainer!"
+                        ,StatusCodes.Status409Conflict);
+                }
+            
+          
             
 
             var trainer = new Trainer 
@@ -49,13 +57,26 @@ namespace MIO.Infrastructure.Services
                 var trainer = await _dbContext.Trainers
                                               .Include(t => t.User)
                                               .FirstOrDefaultAsync(t => t.Id == TrainerId);
-
-           // var trainer = await _dbContext.Trainers.FirstOrDefaultAsync(t => t.Id == TrainerId);
+                
 
             if (trainer == null)
                 throw new AppException($"Trainer with ID {TrainerId} not found"
                    , StatusCodes.Status404NotFound);
 
+            
+            var currentUserId = _currentUser.UserId;
+            
+            var currentUserRole = _currentUser.Role;
+            
+            bool isAdmin = currentUserRole == "Admin";
+            
+            // Ownership check
+            if (trainer.UserId != currentUserId && !isAdmin)
+                throw new AppException(
+                    "You dont have permission to see this student!",
+                    StatusCodes.Status403Forbidden);
+            
+            
             return new TrainerResponseDTO
             {
                 Id = trainer.Id,

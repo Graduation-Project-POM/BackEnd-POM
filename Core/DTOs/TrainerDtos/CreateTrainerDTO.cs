@@ -11,7 +11,7 @@ namespace MIO.Core.DTOs.TrainerDtos
         [Required]
         public int userId { get; set; }
 
-        public User User { get; set; }
+     
         
        
     }

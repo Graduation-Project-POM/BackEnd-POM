@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MIO.API.Settings;
 using MIO.Core.DTOs.ProblemDTOs;
@@ -9,12 +10,19 @@ using MIO2.Core.Interfaces;
 public class ProblemService : IProblemServices
 {
     private readonly AppDbContext _context;
-    private readonly IS3Service _s3Service;
+   // private readonly IS3Service _s3Service;
     private readonly ICurrentUserService _currentUser;
-    public ProblemService(AppDbContext context, IS3Service s3Service, ICurrentUserService currentUser)
+    
+    // public ProblemService(AppDbContext context, IS3Service s3Service, ICurrentUserService currentUser)
+    // {
+    //     _context = context;
+    //     _s3Service = s3Service;
+    //     _currentUser = currentUser;
+    // }
+    
+    public ProblemService(AppDbContext context, ICurrentUserService currentUser)
     {
         _context = context;
-        _s3Service = s3Service;
         _currentUser = currentUser;
     }
 
@@ -27,7 +35,7 @@ public class ProblemService : IProblemServices
             ID = p.ID,
             Title = p.Title,
             Difficulty = p.Difficulty,
-            PhotoUrl = string.IsNullOrEmpty(p.PhotoFileKey) ? null : _s3Service.GetPublicUrl(p.PhotoFileKey),
+            //PhotoUrl = string.IsNullOrEmpty(p.PhotoFileKey) ? null : _s3Service.GetPublicUrl(p.PhotoFileKey),
             Topic = p.Topic,
             IsPublished = p.IsPublished
             
@@ -52,15 +60,16 @@ public class ProblemService : IProblemServices
             Difficulty = p.Difficulty,
             Topic = p.Topic,
             IsPublished = p.IsPublished,
-            PhotoUrl = string.IsNullOrEmpty(p.PhotoFileKey) ? null : _s3Service.GetPublicUrl(p.PhotoFileKey)
+            //PhotoUrl = string.IsNullOrEmpty(p.PhotoFileKey) ? null : _s3Service.GetPublicUrl(p.PhotoFileKey)
         };
     }
 
     public async Task<int> Create(CreateProblemDto dto)
     {
-       var trainerID=_currentUser.UserId;
-        
-        if (!await _context.Trainers.AnyAsync(t => t.Id == trainerID))
+       var userID=_currentUser.UserId;
+       var trainer=await _context.Trainers.FirstOrDefaultAsync(t => t.UserId == userID);
+       
+        if (trainer==null)
         {
             throw new AppException(
                 "Invalid TrainerID. Trainer does not exist.",
@@ -82,7 +91,7 @@ public class ProblemService : IProblemServices
             Difficulty = dto.Difficulty,
             Topic = dto.Topic,
             PhotoFileKey = dto.PhotoFileKey,
-            TrainerID = trainerID,
+            TrainerID = trainer.Id,
             IsPublished = dto.IsPublished,
             CreatedAt = DateTime.UtcNow
         };
@@ -106,8 +115,8 @@ public class ProblemService : IProblemServices
 
         if (!string.IsNullOrEmpty(dto.PhotoFileKey) && dto.PhotoFileKey != problem.PhotoFileKey)
         {
-            if (!string.IsNullOrEmpty(problem.PhotoFileKey))
-                await _s3Service.DeleteMediaAsync(problem.PhotoFileKey);
+            // if (!string.IsNullOrEmpty(problem.PhotoFileKey))
+            //     await _s3Service.DeleteMediaAsync(problem.PhotoFileKey);
 
             problem.PhotoFileKey = dto.PhotoFileKey;
         }
@@ -136,8 +145,8 @@ public class ProblemService : IProblemServices
                 StatusCodes.Status404NotFound);
         }
 
-        if (!string.IsNullOrEmpty(problem.PhotoFileKey))
-            await _s3Service.DeleteMediaAsync(problem.PhotoFileKey);
+        // if (!string.IsNullOrEmpty(problem.PhotoFileKey))
+        //     await _s3Service.DeleteMediaAsync(problem.PhotoFileKey);
         
         _context.Problems.Remove(problem);
         await _context.SaveChangesAsync();

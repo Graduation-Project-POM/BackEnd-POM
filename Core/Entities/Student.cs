@@ -1,4 +1,6 @@
-﻿namespace MIO.Core.Entities
+﻿using MIO2.Core.Entities;
+
+namespace MIO.Core.Entities
 {
     public class Student
     {
@@ -15,5 +17,7 @@
 
         public int UserId { get; set; }
         public User User { get; set; }
+        
+        public ICollection<ContestStudent> ContestStudents { get; set; } = [];
     }
 }

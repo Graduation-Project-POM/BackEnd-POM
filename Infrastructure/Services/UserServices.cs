@@ -31,6 +31,40 @@ namespace MIO.Infrastructure.Services
             _dbContext = dbContext;
             //_currentUser = currentUser;
         }
+        
+        
+        public AuthResponseDTO CreateToken(JwtOptions jwtOptions,User user)
+        { 
+            var expires = DateTime.UtcNow.AddMinutes(jwtOptions.lifetime);
+
+
+            var claims = new[]
+            {
+                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
+                new Claim(ClaimTypes.Name, user.UserName),
+                new Claim(ClaimTypes.Role, user.RoleID.ToString())
+            };
+
+            var token = new JwtSecurityToken(
+                issuer: jwtOptions.Issuer,
+                audience: jwtOptions.Audience,
+                claims: claims,
+                expires: expires,
+                signingCredentials: new SigningCredentials(
+                    new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.signingkey)),
+                    SecurityAlgorithms.HmacSha256)
+            );
+
+            return new AuthResponseDTO
+            {
+                AccessToken = new JwtSecurityTokenHandler().WriteToken(token),
+                ExpiresAt = expires,
+                UserId = user.Id,
+                UserName = user.UserName,
+                Role = user.RoleID.ToString()
+            };
+        }
+        
 
         public async Task<User?> CreateUser(CreateUserDTO userDTO)
         {
@@ -153,38 +187,6 @@ namespace MIO.Infrastructure.Services
 
             return userResponse;
 
-        }
-
-        public AuthResponseDTO CreateToken(JwtOptions jwtOptions,User user)
-        { 
-            var expires = DateTime.UtcNow.AddMinutes(jwtOptions.lifetime);
-
-
-            var claims = new[]
-            {
-                new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-                new Claim(ClaimTypes.Name, user.UserName),
-                new Claim(ClaimTypes.Role, user.RoleID.ToString())
-            };
-
-            var token = new JwtSecurityToken(
-                issuer: jwtOptions.Issuer,
-                audience: jwtOptions.Audience,
-                claims: claims,
-                expires: expires,
-                signingCredentials: new SigningCredentials(
-                    new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtOptions.signingkey)),
-                    SecurityAlgorithms.HmacSha256)
-                );
-
-            return new AuthResponseDTO
-            {
-                AccessToken = new JwtSecurityTokenHandler().WriteToken(token),
-                ExpiresAt = expires,
-                UserId = user.Id,
-                UserName = user.UserName,
-                Role = user.RoleID.ToString()
-            };
         }
        
         public async Task<IEnumerable<User>> GetUsersService()

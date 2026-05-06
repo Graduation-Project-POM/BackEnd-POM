@@ -1,8 +1,9 @@
-namespace MIO.Core.Enums;
-
-public enum Difficulty
+namespace MIO.Core.Enums
 {
-Easy=1,
-Medium, 
-Hard 
+    public enum Difficulty
+    {
+        Easy = 1,
+        Medium,
+        Hard
+    }
 }

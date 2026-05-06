@@ -1,10 +1,13 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System.Security.Claims;
+using Microsoft.EntityFrameworkCore;
 using MIO.API.Settings;
 using MIO.Core.DTOs.StudentDTO;
 using MIO.Core.DTOs.StudentDtos;
 using MIO.Core.DTOs.UserDtos;
 using MIO.Core.Entities;
+using MIO.Core.Enums;
 using MIO.Core.Interfaces;
+using MIO2.Core.DTOs.StudentDtos;
 using MIO2.Core.Events.EventBus;
 using MIO2.Core.Events.Students;
 
@@ -13,15 +16,18 @@ namespace MIO.Infrastructure.Services
     public class StudentServices : IStudentService
     {
         private readonly AppDbContext _dbContext;
+        private readonly ICurrentUserService _currentUser;
 
-        public StudentServices(AppDbContext dbContext)
+        public StudentServices(AppDbContext dbContext, ICurrentUserService currentUser)
         {
             _dbContext = dbContext;
+            _currentUser= currentUser;
         }
 
         public async Task<Student?> CreateStudent(CreateStudentDTO studentDTO)
         {
-           
+            var user=await _dbContext.Users.FirstOrDefaultAsync(u=>u.Id==studentDTO.UserId);
+            
             if (!await _dbContext.Users.AnyAsync(u => u.Id == studentDTO.UserId))
             {
                 throw new AppException(
@@ -37,7 +43,11 @@ namespace MIO.Infrastructure.Services
                     StatusCodes.Status409Conflict);
             }
 
-            // add role verification here if needed
+            if (user.RoleID != Role.Student)
+            {
+                throw new AppException("this user is not a student!"
+                    ,StatusCodes.Status409Conflict);
+            }
            
 
             var student = new Student
@@ -65,6 +75,18 @@ namespace MIO.Infrastructure.Services
                     $"Student with ID {studentId} not found",
                     StatusCodes.Status404NotFound);
 
+            var currentUserId = _currentUser.UserId;
+            
+            var currentUserRole = _currentUser.Role;
+            
+            bool isAdminOrTrainer = currentUserRole is "Admin" or "Trainer";  ;
+            
+            // Ownership check
+            if (student.UserId != currentUserId && !isAdminOrTrainer)
+                throw new AppException(
+                    "You dont have permission to see this student!",
+                    StatusCodes.Status403Forbidden);
+            
             return new StudentResponseDTO
             {
                 Id = student.Id,
@@ -118,7 +140,45 @@ namespace MIO.Infrastructure.Services
             });
         }
 
+        public async Task<MultipleStudentsResponseDTO> GetMultipleStudentsService(IEnumerable<int> ids)
+        {
+            var idList = ids.ToList();
 
+            var students = await _dbContext.Students
+                .Where(s => idList.Contains(s.Id))
+                .Include(s => s.User)
+                .ToListAsync();
+
+            var foundIds = students.Select(s => s.Id).ToList();
+            var missingIds = idList.Except(foundIds).ToList();
+
+            return new MultipleStudentsResponseDTO
+            {
+                Students = students.Select(student => new StudentResponseDTO
+                {
+                    Id = student.Id,
+                    GradeLevel = student.GradeLevel,
+                    City = student.City,
+                    SchoolName = student.SchoolName,
+                    NationalId = student.NationalId,
+                    ProblemSolved = student.ProblemSolved,
+                    Score = student.Score,
+                    JoinYear = student.JoinYear,
+                    IsAccepted = student.IsAccepted,
+                    BasicUser = new BasicUserDTO
+                    {
+                        Id = student.UserId,
+                        FirstName = student.User.FirstName,
+                        LastName = student.User.LastName,
+                        Email = student.User.Email,
+                        UserName = student.User.UserName,
+                        PhoneNumber = student.User.PhoneNumber
+                    }
+                }),
+                MissingIds = missingIds
+            };
+        }
+        
         public async Task<Student?> UpdateStudentService(int id, UpdateStudentDTO studentDTO)
         {
             var existingStudent = await _dbContext.Students

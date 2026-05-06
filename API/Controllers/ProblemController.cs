@@ -9,14 +9,18 @@ using MIO2.Core.Interfaces;
 public class ProblemsController : ControllerBase
 {
     private readonly IProblemServices _Problemservice;
-    private readonly IS3Service _s3Service;
+    //private readonly IS3Service _s3Service;
 
-    public ProblemsController(IProblemServices problemservice,IS3Service s3Service)
+    public ProblemsController(IProblemServices problemservice)
     {
         _Problemservice = problemservice;
-        _s3Service = s3Service;
+       
     }
-
+    // public ProblemsController(IProblemServices problemservice,IS3Service s3Service)
+    // {
+    //     _Problemservice = problemservice;
+    //     _s3Service = s3Service;
+    // }
     [HttpGet]
     [Authorize(Roles ="Admin,Trainer")]
     public async Task<ActionResult<IEnumerable<ProblemResponseDTO>>> GetAll()
@@ -35,18 +39,18 @@ public class ProblemsController : ControllerBase
         return Ok(result);
     }
 
-    [HttpPost("upload-url")]            
-    [Authorize(Roles = "Admin,Trainer")]
-    public ActionResult GetUploadUrl([FromQuery] string fileName, [FromQuery] string contentType)
-    {
-        var (fileKey, preSignedUrl) = _s3Service.CreateUploadURL(fileName, contentType);
-        
-        return Ok(new { fileKey, preSignedUrl });
-    }
+    // [HttpPost("upload-url")]            
+    // [Authorize(Roles = "Admin,Trainer")]
+    // public ActionResult GetUploadUrl([FromQuery] string fileName, [FromQuery] string contentType)
+    // {
+    //     var (fileKey, preSignedUrl) = _s3Service.CreateUploadURL(fileName, contentType);
+    //     
+    //     return Ok(new { fileKey, preSignedUrl });
+    // }
     
     [HttpPost]
     [Authorize(Roles ="Admin,Trainer")]
-    public async Task<ActionResult> Create(CreateProblemDto dto)
+    public async Task<ActionResult> Create([FromBody] CreateProblemDto dto)
     {
         var id = await _Problemservice.Create(dto);
         return CreatedAtAction("Get", new { id }, new { problemId = id });

@@ -22,6 +22,21 @@ namespace MIO.Migrations
 
             SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
 
+            modelBuilder.Entity("ContestProblem", b =>
+                {
+                    b.Property<int>("ContestsId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProblemsID")
+                        .HasColumnType("int");
+
+                    b.HasKey("ContestsId", "ProblemsID");
+
+                    b.HasIndex("ProblemsID");
+
+                    b.ToTable("ContestProblem");
+                });
+
             modelBuilder.Entity("MIO.Core.Entities.Student", b =>
                 {
                     b.Property<int>("Id")
@@ -157,6 +172,72 @@ namespace MIO.Migrations
                     b.ToTable("Users");
                 });
 
+            modelBuilder.Entity("MIO2.Core.Entities.Contest", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Description")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<DateTime>("EndAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<DateTime>("StartAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Status")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("TrainerId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TrainerId");
+
+                    b.ToTable("Contests");
+                });
+
+            modelBuilder.Entity("MIO2.Core.Entities.ContestStudent", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ContestId")
+                        .HasColumnType("int");
+
+                    b.Property<int>("ProblemSolved")
+                        .HasColumnType("int");
+
+                    b.Property<int>("Score")
+                        .HasColumnType("int");
+
+                    b.Property<int>("StudentId")
+                        .HasColumnType("int");
+
+                    b.Property<double>("TimeToFinishTheContest")
+                        .HasColumnType("float");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ContestId");
+
+                    b.HasIndex("StudentId");
+
+                    b.ToTable("ContestStudents");
+                });
+
             modelBuilder.Entity("MIO2.Core.Entities.Gallery", b =>
                 {
                     b.Property<int>("Id")
@@ -172,6 +253,9 @@ namespace MIO.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("bit");
+
                     b.Property<int>("RefID")
                         .HasColumnType("int");
 
@@ -184,7 +268,7 @@ namespace MIO.Migrations
 
                     b.Property<string>("Type")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("nvarchar(1)");
 
                     b.Property<int>("UploadedByID")
                         .HasColumnType("int");
@@ -201,6 +285,70 @@ namespace MIO.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("Gallery");
+                });
+
+            modelBuilder.Entity("Problem", b =>
+                {
+                    b.Property<int>("ID")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ID"));
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("Difficulty")
+                        .HasMaxLength(50)
+                        .HasColumnType("int");
+
+                    b.Property<bool>("IsPublished")
+                        .HasColumnType("bit");
+
+                    b.Property<string>("PhotoFileKey")
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
+
+                    b.Property<string>("Statement")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<string>("Topic")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("nvarchar(255)");
+
+                    b.Property<int>("TrainerID")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("ID");
+
+                    b.HasIndex("TrainerID");
+
+                    b.ToTable("Problems");
+                });
+
+            modelBuilder.Entity("ContestProblem", b =>
+                {
+                    b.HasOne("MIO2.Core.Entities.Contest", null)
+                        .WithMany()
+                        .HasForeignKey("ContestsId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Problem", null)
+                        .WithMany()
+                        .HasForeignKey("ProblemsID")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("MIO.Core.Entities.Student", b =>
@@ -225,6 +373,36 @@ namespace MIO.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("MIO2.Core.Entities.Contest", b =>
+                {
+                    b.HasOne("MIO.Core.Entities.Trainer", "trainer")
+                        .WithMany("Contests")
+                        .HasForeignKey("TrainerId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("trainer");
+                });
+
+            modelBuilder.Entity("MIO2.Core.Entities.ContestStudent", b =>
+                {
+                    b.HasOne("MIO2.Core.Entities.Contest", "Contest")
+                        .WithMany("ContestStudents")
+                        .HasForeignKey("ContestId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MIO.Core.Entities.Student", "Student")
+                        .WithMany("ContestStudents")
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Contest");
+
+                    b.Navigation("Student");
+                });
+
             modelBuilder.Entity("MIO2.Core.Entities.Gallery", b =>
                 {
                     b.HasOne("MIO.Core.Entities.User", "User")
@@ -236,6 +414,27 @@ namespace MIO.Migrations
                     b.Navigation("User");
                 });
 
+            modelBuilder.Entity("Problem", b =>
+                {
+                    b.HasOne("MIO.Core.Entities.Trainer", "Trainer")
+                        .WithMany()
+                        .HasForeignKey("TrainerID")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Trainer");
+                });
+
+            modelBuilder.Entity("MIO.Core.Entities.Student", b =>
+                {
+                    b.Navigation("ContestStudents");
+                });
+
+            modelBuilder.Entity("MIO.Core.Entities.Trainer", b =>
+                {
+                    b.Navigation("Contests");
+                });
+
             modelBuilder.Entity("MIO.Core.Entities.User", b =>
                 {
                     b.Navigation("Student")
@@ -243,6 +442,11 @@ namespace MIO.Migrations
 
                     b.Navigation("Trainer")
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("MIO2.Core.Entities.Contest", b =>
+                {
+                    b.Navigation("ContestStudents");
                 });
 #pragma warning restore 612, 618
         }
