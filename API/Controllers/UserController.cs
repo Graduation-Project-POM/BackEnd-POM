@@ -50,8 +50,8 @@ namespace MIO.API.Controllers
 
         [HttpPost]
         [Route("")]
-        //[Authorize(Roles ="Admin")]
-        [AllowAnonymous]
+        [Authorize(Roles ="Admin")]
+        //[AllowAnonymous]
         public async Task<ActionResult> createUser(CreateUserDTO userDTO)
         {  
               var user=  await userServices.CreateUser(userDTO);
