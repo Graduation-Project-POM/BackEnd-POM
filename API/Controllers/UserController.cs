@@ -21,31 +21,7 @@ namespace MIO.API.Controllers
     {
        
 
-        [HttpPost]
-        [Route("auth")]
-        [AllowAnonymous]
-        public async Task<ActionResult<AuthResponseDTO>>AuthenticateUser([FromBody]AuthenticationRequest? request)
-        {
-
-            if (request == null ||
-                string.IsNullOrWhiteSpace(request.UserName) ||
-                string.IsNullOrWhiteSpace(request.Password))
-            {
-                return BadRequest("Please enter your login data");
-            }
-
-
-           var user= await userServices.GetUserService(request);
-
-            if (user ==null)
-                return Unauthorized("Invalid username or password");
-
-            var accessToken = userServices.CreateToken(jwtOptions, user);
-
-
-            return Ok(accessToken);
-
-        }
+        
 
 
         [HttpPost]

@@ -24,6 +24,12 @@ namespace MIO.Core.Entities
 
         public Trainer Trainer { get; set; }
         public Student Student { get; set; }
+        
+        //Refresh Token
+        public string RefreshTokenHash { get; set; }
+        public DateTime? RefreshTokenExpiresAt { get; set; }
+        public DateTime? RefreshTokenRevokedAt { get; set; }
+        
 
     }
 }

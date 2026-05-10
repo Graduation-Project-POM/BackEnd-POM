@@ -40,6 +40,13 @@ namespace MIO.Infrastructure.Services
             return CryptographicOperations.FixedTimeEquals(computedHash, storedHash);
         }
         
+        
+        public static string HashRefreshToken(string token)
+        {
+            var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(token));
+            return Convert.ToBase64String(bytes);
+        }
+        
         //old approach
         /*public static void CreatePasswordHash(string password, out byte[] passwordHash,
             out byte[] passwordsalt)

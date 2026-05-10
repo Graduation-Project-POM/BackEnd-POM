@@ -13,7 +13,10 @@ using MIO2.Infrastructure.Events;
 using MIO2.Infrastructure.Services;
 using System;
 using System.Text;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.OpenApi.Models;
+using MIO2.API.Authorization;
+using MIO2.API.Authorization.Trainer;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -118,6 +121,11 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 builder.Services.AddScoped<IS3Service, S3Service>();
 builder.Services.AddScoped<IProblemServices, ProblemService>();
 builder.Services.AddScoped<IContestService,ContestService>();
+builder.Services.AddScoped<IAuthService,AuthService>();
+
+builder.Services.AddScoped<IAuthorizationHandler, StudentOwnerOrAdminOrTrainerHandler>();
+builder.Services.AddSingleton<IAuthorizationHandler, TrainerOwnerOrAdminHandler >();
+builder.Services.AddHttpContextAccessor();
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -135,7 +143,17 @@ builder.Services
         };
     });
 
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("StudentOwnerOrAdminOrTrainer", policy =>
+        policy.Requirements.Add(new StudentOwnerOrAdminOrTrainerRequirement()));
+});
 
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("TrainerOwnerOrAdmin", policy =>
+        policy.Requirements.Add(new TrainerOwnerOrAdminRequirement()));
+});
 
 
 //CORS Policy

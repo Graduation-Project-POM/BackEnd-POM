@@ -12,6 +12,7 @@ public class Contest
     public int TrainerId { get; set; }
     public Trainer trainer { get; set; }
     
+    
     public ContestStatus Status { get; set; } = ContestStatus.Upcoming;
     
     

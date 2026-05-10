@@ -1,4 +1,6 @@
 ﻿using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MIO.API.Settings;
 using MIO.Core.DTOs.StudentDTO;
@@ -17,7 +19,8 @@ namespace MIO.Infrastructure.Services
     {
         private readonly AppDbContext _dbContext;
         private readonly ICurrentUserService _currentUser;
-
+      
+        
         public StudentServices(AppDbContext dbContext, ICurrentUserService currentUser)
         {
             _dbContext = dbContext;
@@ -74,18 +77,7 @@ namespace MIO.Infrastructure.Services
                 throw new AppException(
                     $"Student with ID {studentId} not found",
                     StatusCodes.Status404NotFound);
-
-            var currentUserId = _currentUser.UserId;
             
-            var currentUserRole = _currentUser.Role;
-            
-            bool isAdminOrTrainer = currentUserRole is "Admin" or "Trainer";  ;
-            
-            // Ownership check
-            if (student.UserId != currentUserId && !isAdminOrTrainer)
-                throw new AppException(
-                    "You dont have permission to see this student!",
-                    StatusCodes.Status403Forbidden);
             
             return new StudentResponseDTO
             {

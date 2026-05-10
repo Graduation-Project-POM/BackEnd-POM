@@ -22,13 +22,20 @@ public class ContestService:IContestService
         
     }
  
+    
     public async Task<Contest> CreateContest(createContestDTO createContestDTO)
     {
         var trainerId =await  _dbContext.Trainers.Where(t => t.UserId == _currentUser.UserId).
             Select(t => t.Id).
             FirstOrDefaultAsync();
+
+        if (trainerId == 0)
+        {
+            throw new AppException($"You must be a Trainer to create a contest", StatusCodes.Status403Forbidden);
+        }
         
-        Console.WriteLine($"UserId: {_currentUser.UserId}, TrainerId: {trainerId}");
+        
+        //Console.WriteLine($"UserId: {_currentUser.UserId}, TrainerId: {trainerId}");
         
         var problems = await _dbContext.Problems
             .Where(p => createContestDTO.ProblemIds.Contains(p.ID))
@@ -96,5 +103,53 @@ public class ContestService:IContestService
             MissingIds = missingIds
         };
     }
+    
+    
+    public async Task<List<ContestDTO>> GetContests()
+    {
+        return await _dbContext.Contests
+            .Include(c => c.Problems)
+            .Include(c => c.ContestStudents)
+            .Select(c => new ContestDTO
+            {
+                Id = c.Id,
+                Title = c.Title,
+                Description = c.Description,
+                Status = c.Status,
+                StartAt = c.StartAt,
+                EndAt = c.EndAt,
+                TrainerId = c.TrainerId,
+                ProblemCount = c.Problems.Count,
+                StudentCount = c.ContestStudents.Count
+            })
+            .ToListAsync();
+    }
+
+    public async Task<ContestDTO> GetContestById(int contestId)
+    {
+        var contest = await _dbContext.Contests
+            .Include(c => c.Problems)
+            .Include(c => c.ContestStudents)
+            .Where(c => c.Id == contestId)
+            .Select(c => new ContestDTO
+            {
+                Id = c.Id,
+                Title = c.Title,
+                Description = c.Description,
+                Status = c.Status,
+                StartAt = c.StartAt,
+                EndAt = c.EndAt,
+                TrainerId = c.TrainerId,
+                ProblemCount = c.Problems.Count,
+                StudentCount = c.ContestStudents.Count
+            })
+            .FirstOrDefaultAsync();
+
+        if (contest == null)
+            throw new AppException($"Contest with ID {contestId} not found", StatusCodes.Status404NotFound);
+
+        return contest;
+    }
+    
     
 }

@@ -16,7 +16,7 @@ namespace MIO.Core.Interfaces
 
          Task<UserResponseDTO?> GetUserByIDService(int UserId);
 
-        AuthResponseDTO CreateToken(JwtOptions jwtOptions, User user);
+        
 
         Task<IEnumerable<User>> GetUsersService();
 

@@ -37,6 +37,19 @@ public ContestController(IContestService contestService)
         return Ok(result);
     }
     
+    [HttpGet]
+    public async Task<ActionResult<List<ContestDTO>>> GetContests()
+    {
+        var contests = await _contestService.GetContests();
+        return Ok(contests);
+    }
+
+    [HttpGet("{contestId}")]
+    public async Task<ActionResult<ContestDTO>> GetContestById(int contestId)
+    {
+        var contest = await _contestService.GetContestById(contestId);
+        return Ok(contest);
+    }
     
     
 }

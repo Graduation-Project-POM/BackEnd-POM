@@ -16,11 +16,12 @@ namespace MIO.API.Controllers
     {
         private readonly IStudentService _studentService;
         private readonly EmailService _emailService;
-
+        
         public StudentController(IStudentService studentService, EmailService emailService)
         {
             _studentService = studentService;
             _emailService = emailService;
+           
         }
 
             [HttpPost]
@@ -48,7 +49,7 @@ namespace MIO.API.Controllers
 
         [HttpGet]
         [Route("{id}")]
-        [Authorize(Roles ="Admin,Trainer,Student")]
+        [Authorize(Policy = "StudentOwnerOrAdminOrTrainer")]
         public async Task<ActionResult> GetStudentById(int id)
         {
             var student = await _studentService.GetStudentByIDService(id);
