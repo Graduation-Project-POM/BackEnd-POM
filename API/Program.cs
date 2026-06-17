@@ -195,6 +195,8 @@ app.UseHttpsRedirection();
 app.UseCors("MIOCorsPolicy");
 
 app.UseAuthentication();
+
+
 app.UseAuthorization();
 
 

@@ -21,9 +21,28 @@ namespace MIO.API.Middlewares
                 
                 await _next(context);
             }
+            catch (AppException ex)
+            {
+                context.Response.StatusCode = ex.StatusCode;
+                context.Response.ContentType = "application/json";
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    status = ex.StatusCode,
+                    code = ex.ErrorCode,
+                    message = ex.Message
+                });
+            }
             catch (Exception ex)
             {
-                await HandleException(context, ex);
+                _logger.LogError(ex, "Unhandled exception");
+                context.Response.StatusCode = StatusCodes.Status500InternalServerError;
+                context.Response.ContentType = "application/json";
+                await context.Response.WriteAsJsonAsync(new
+                {
+                    status = 500,
+                    code = "SERVER_ERROR",
+                    message = "An unexpected error occurred."
+                });
             }
 
         }

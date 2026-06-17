@@ -19,9 +19,8 @@ namespace MIO.Core.DTOs.UserDtos
             [Required]
             [MinLength(4)]  
             public required string UserName { get; set; }
-            [Required]
             [Phone]
-            public required string PhoneNumber { get; set; }
+            public string? PhoneNumber { get; set; }
             [Required]
             [RegularExpression("male|female", ErrorMessage = "Gender must be male or female")]
             public required string Gender { get; set; }

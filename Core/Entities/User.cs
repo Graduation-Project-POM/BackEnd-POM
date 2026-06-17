@@ -12,7 +12,7 @@ namespace MIO.Core.Entities
         public string UserName { get; set; }
         public  byte[] PasswordHash { get; set; }
         public  byte[] PasswordSalt { get; set; }
-        public string PhoneNumber { get; set; }
+        public string? PhoneNumber { get; set; }
         public required string Gender { get; set; }
         public string ProfileImageUrl { get; set; }
         public bool IsActive { get; set; }

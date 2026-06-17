@@ -18,7 +18,6 @@ namespace MIO.Core.DTOs.UserDtos
             [Required]
             [MinLength(4)]  
             public required string UserName { get; set; }
-            [Required]
             [Phone]
             public string? PhoneNumber { get; set; }
             [Required]
