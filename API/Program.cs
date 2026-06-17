@@ -91,6 +91,8 @@ builder.Services.AddSwaggerGen(options =>
 
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
+Console.WriteLine("CONNECTION STRING:");
+Console.WriteLine(builder.Configuration.GetConnectionString("DefaultConnection"));
 
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
@@ -158,18 +160,18 @@ builder.Services.AddAuthorization(options =>
 });
 
 
-//CORS Policy
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("MIOCorsPolicy", policy =>
     {
         policy
-            .WithOrigins("http://localhost:5173") 
+            .SetIsOriginAllowed(origin =>
+                Uri.TryCreate(origin, UriKind.Absolute, out var uri) &&
+                (uri.Host == "localhost" || uri.Host == "127.0.0.1"))
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
 });
-
 
 var app = builder.Build();
 
@@ -192,45 +194,55 @@ using (var scope = app.Services.CreateScope())
 
 using (var scope = app.Services.CreateScope())
 {
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-    if (!db.Users.Any(u => u.RoleID == Role.Admin))
+    try
     {
-        Security.CreatePasswordHash("Admin123!", out byte[] hash, out byte[] salt);
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        db.Users.Add(new User
+        Security.CreatePasswordHash("Admin1234", out byte[] hash, out byte[] salt);
+
+        var admin = db.Users.FirstOrDefault(u => u.UserName == "admin");
+        if (admin == null)
         {
-            FirstName = "System",
-            MiddleName = "",
-            LastName = "Admin",
-            Email = "admin@pmo.ps",
-            UserName = "admin",
-            PasswordHash = hash,
-            PasswordSalt = salt,
-            PhoneNumber = null,
-            Gender = "male",
-            ProfileImageUrl = "",
-            IsActive = true,
-            CreatedAt = DateTime.UtcNow,
-            LastUpdatedAt = DateTime.UtcNow,
-            RoleID = Role.Admin
-        });
+            db.Users.Add(new User
+            {
+                FirstName = "System",
+                MiddleName = "",
+                LastName = "Admin",
+                Email = "admin@pmo.ps",
+                UserName = "admin",
+                PasswordHash = hash,
+                PasswordSalt = salt,
+                PhoneNumber = null,
+                Gender = "male",
+                ProfileImageUrl = "",
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                LastUpdatedAt = DateTime.UtcNow,
+                RoleID = Role.Admin
+            });
+        }
+        else
+        {
+            admin.PasswordHash = hash;
+            admin.PasswordSalt = salt;
+            admin.RoleID = Role.Admin;
+            admin.IsActive = true;
+        }
 
         db.SaveChanges();
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Admin seeding failed");
     }
 }
 
 app.UseMiddleware<ExceptionMiddleWare>();
-
 app.UseHttpsRedirection();
+app.UseRouting();
 app.UseCors("MIOCorsPolicy");
-
 app.UseAuthentication();
-
-
 app.UseAuthorization();
-
-
 
 app.MapControllers();
 
