@@ -34,7 +34,7 @@ namespace MIO.Migrations
 
                     b.HasIndex("ProblemsID");
 
-                    b.ToTable("ContestProblem");
+                    b.ToTable("ContestProblem", (string)null);
                 });
 
             modelBuilder.Entity("MIO.Core.Entities.Student", b =>
@@ -81,7 +81,7 @@ namespace MIO.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("Students");
+                    b.ToTable("Students", (string)null);
                 });
 
             modelBuilder.Entity("MIO.Core.Entities.Trainer", b =>
@@ -104,7 +104,7 @@ namespace MIO.Migrations
                     b.HasIndex("UserId")
                         .IsUnique();
 
-                    b.ToTable("Trainers");
+                    b.ToTable("Trainers", (string)null);
                 });
 
             modelBuilder.Entity("MIO.Core.Entities.User", b =>
@@ -141,7 +141,6 @@ namespace MIO.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<string>("MiddleName")
-                        .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<byte[]>("PasswordHash")
@@ -177,7 +176,7 @@ namespace MIO.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("Users");
+                    b.ToTable("Users", (string)null);
                 });
 
             modelBuilder.Entity("MIO2.Core.Entities.Contest", b =>
@@ -211,7 +210,7 @@ namespace MIO.Migrations
 
                     b.HasIndex("TrainerId");
 
-                    b.ToTable("Contests");
+                    b.ToTable("Contests", (string)null);
                 });
 
             modelBuilder.Entity("MIO2.Core.Entities.ContestStudent", b =>
@@ -243,7 +242,7 @@ namespace MIO.Migrations
 
                     b.HasIndex("StudentId");
 
-                    b.ToTable("ContestStudents");
+                    b.ToTable("ContestStudents", (string)null);
                 });
 
             modelBuilder.Entity("MIO2.Core.Entities.Gallery", b =>
@@ -292,7 +291,7 @@ namespace MIO.Migrations
 
                     b.HasIndex("UserId");
 
-                    b.ToTable("Gallery");
+                    b.ToTable("Gallery", (string)null);
                 });
 
             modelBuilder.Entity("Problem", b =>
@@ -341,7 +340,7 @@ namespace MIO.Migrations
 
                     b.HasIndex("TrainerID");
 
-                    b.ToTable("Problems");
+                    b.ToTable("Problems", (string)null);
                 });
 
             modelBuilder.Entity("ContestProblem", b =>
