@@ -27,7 +27,6 @@ namespace MIO.API.Controllers
         [HttpPost]
         [Route("")]
         [Authorize(Roles ="Admin")]
-        //[AllowAnonymous]
         public async Task<ActionResult> createUser(CreateUserDTO userDTO)
         {  
               var user=  await userServices.CreateUser(userDTO);
@@ -37,6 +36,14 @@ namespace MIO.API.Controllers
                     message = "User Created successfully",
                     userId = user.Id
                 });      
+        }
+
+        [HttpPost("register")]
+        [AllowAnonymous]
+        public async Task<IActionResult> Register(CreateUserDTO dto)
+        {
+            var user = await userServices.RegisterStudent(dto);
+            return Ok(new { message = "Account created successfully", userId = user!.Id });
         }
 
         [HttpGet]

@@ -12,13 +12,13 @@ namespace MIO.Core.Entities
         public string UserName { get; set; }
         public  byte[] PasswordHash { get; set; }
         public  byte[] PasswordSalt { get; set; }
-        public required string PhoneNumber { get; set; }
+        public string PhoneNumber { get; set; }
         public required string Gender { get; set; }
         public string ProfileImageUrl { get; set; }
         public bool IsActive { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime LastUpdatedAt { get; set; }
-        public Role RoleID { get; set; }
+        public Role RoleID { get; set; } = Role.Student;
 
 
 
@@ -26,7 +26,7 @@ namespace MIO.Core.Entities
         public Student Student { get; set; }
         
         //Refresh Token
-        public string RefreshTokenHash { get; set; }
+        public string? RefreshTokenHash { get; set; }
         public DateTime? RefreshTokenExpiresAt { get; set; }
         public DateTime? RefreshTokenRevokedAt { get; set; }
         

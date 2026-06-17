@@ -13,6 +13,7 @@ using MIO.Core.DTOs.StudentDtos;
 using MIO.Core.DTOs.TrainerDtos;
 using MIO.Core.DTOs.UserDtos;
 using MIO.Core.Entities;
+using MIO.Core.Enums;
 using MIO.Core.Interfaces;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
@@ -29,7 +30,7 @@ namespace MIO.Infrastructure.Services
         public UserServices(AppDbContext dbContext ,ICurrentUserService currentUser)
         {
             _dbContext = dbContext;
-            //_currentUser = currentUser;
+            _currentUser = currentUser;
         }
         
         
@@ -72,6 +73,36 @@ namespace MIO.Infrastructure.Services
 
             return user; 
 
+        }
+
+        public async Task<User?> RegisterStudent(CreateUserDTO userDTO)
+        {
+            if (await _dbContext.Users.AnyAsync(u => u.UserName == userDTO.UserName))
+                throw new AppException("Username already exists", StatusCodes.Status409Conflict);
+
+            Security.CreatePasswordHash(userDTO.Password, out byte[] passwordHash, out byte[] passwordSalt);
+
+            var user = new User
+            {
+                FirstName = userDTO.FirstName,
+                MiddleName = userDTO.MiddleName,
+                LastName = userDTO.LastName,
+                Email = userDTO.Email,
+                UserName = userDTO.UserName,
+                PasswordHash = passwordHash,
+                PasswordSalt = passwordSalt,
+                PhoneNumber = userDTO.PhoneNumber,
+                Gender = userDTO.Gender,
+                ProfileImageUrl = userDTO.ProfileImageUrl,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow,
+                LastUpdatedAt = DateTime.UtcNow,
+                RoleID = Role.Student   
+            };
+
+            _dbContext.Users.Add(user);
+            await _dbContext.SaveChangesAsync();
+            return user;
         }
 
         public async Task<User?> GetUserService(AuthenticationRequest request)

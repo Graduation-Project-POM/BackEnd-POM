@@ -10,7 +10,9 @@ namespace MIO.Core.Interfaces
     {
         Task<User?> CreateUser(CreateUserDTO userDTO);
 
-      //Task<bool> IsUserExist(AuthenticationRequest request);
+        Task<User?> RegisterStudent(CreateUserDTO userDTO);
+
+        //Task<bool> IsUserExist(AuthenticationRequest request);
 
         Task<User?> GetUserService(AuthenticationRequest request);
 

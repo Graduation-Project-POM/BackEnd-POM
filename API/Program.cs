@@ -157,19 +157,16 @@ builder.Services.AddAuthorization(options =>
 
 
 //CORS Policy
-// builder.Services.AddCors(options =>
-// {
-//     options.AddPolicy("MIOCorsPolicy", policy =>
-//     {
-//         policy
-//             .WithOrigins(
-//                 "https://localhost:7205",
-//                 "http://localhost:5084"
-//             )
-//             .AllowAnyHeader()
-//             .AllowAnyMethod();
-//     });
-// });
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("MIOCorsPolicy", policy =>
+    {
+        policy
+            .WithOrigins("http://localhost:5173") 
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
+});
 
 
 var app = builder.Build();
@@ -195,7 +192,7 @@ using (var scope = app.Services.CreateScope())
 app.UseMiddleware<ExceptionMiddleWare>();
 
 app.UseHttpsRedirection();
-//app.UseCors("MIOCorsPolicy");
+app.UseCors("MIOCorsPolicy");
 
 app.UseAuthentication();
 app.UseAuthorization();
