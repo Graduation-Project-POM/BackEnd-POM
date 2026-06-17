@@ -19,11 +19,7 @@ namespace MIO.API.Controllers
     [Authorize]
     public class UserController(JwtOptions jwtOptions,IUserService userServices) : ControllerBase
     {
-       
-
         
-
-
         [HttpPost]
         [Route("")]
         [Authorize(Roles ="Admin")]
