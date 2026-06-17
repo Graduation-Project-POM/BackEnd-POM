@@ -17,7 +17,9 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.OpenApi.Models;
 using MIO2.API.Authorization;
 using MIO2.API.Authorization.Trainer;
-
+using MIO.Core.Entities;       
+using MIO.Core.Enums;           
+using MIO.API.Authentication;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -188,6 +190,35 @@ using (var scope = app.Services.CreateScope())
     studentEvents.Accepted += emailHandler.Handle;
 }
 
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+    if (!db.Users.Any(u => u.RoleID == Role.Admin))
+    {
+        Security.CreatePasswordHash("Admin123!", out byte[] hash, out byte[] salt);
+
+        db.Users.Add(new User
+        {
+            FirstName = "System",
+            MiddleName = "",
+            LastName = "Admin",
+            Email = "admin@pmo.ps",
+            UserName = "admin",
+            PasswordHash = hash,
+            PasswordSalt = salt,
+            PhoneNumber = null,
+            Gender = "male",
+            ProfileImageUrl = "",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow,
+            LastUpdatedAt = DateTime.UtcNow,
+            RoleID = Role.Admin
+        });
+
+        db.SaveChanges();
+    }
+}
 
 app.UseMiddleware<ExceptionMiddleWare>();
 
