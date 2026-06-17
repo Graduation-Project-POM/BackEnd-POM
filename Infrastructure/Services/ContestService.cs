@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MIO.API.Settings;
 using MIO.Core.DTOs.ContestDTOs;
+using MIO.Core.DTOs.ProblemDTOs;
 using MIO.Core.Interfaces;
 using MIO.Infrastructure;
 using MIO.Infrastructure.Services;
@@ -183,6 +184,28 @@ public class ContestService:IContestService
     }
     
     
+    public async Task<List<ProblemResponseDTO>> GetContestProblems(int contestId)
+    {
+        var exists = await _dbContext.Contests.AnyAsync(c => c.Id == contestId);
+        if (!exists)
+            throw new AppException($"Contest with ID {contestId} not found", StatusCodes.Status404NotFound);
+
+        return await _dbContext.Contests
+            .Where(c => c.Id == contestId)
+            .SelectMany(c => c.Problems)
+            .Select(p => new ProblemResponseDTO
+            {
+                ID = p.ID,
+                Title = p.Title,
+                Difficulty = p.Difficulty,
+                Topic = p.Topic,
+                PhotoUrl = p.PhotoFileKey,
+                IsPublished = p.IsPublished
+            })
+            .ToListAsync();
+    }
+
+
     public async Task<ContestDTO> UpdateContest(int contestId, UpdateContestDTO dto)
     {
         var isAdmin = _currentUser.Role == "Admin";

@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MIO.Core.DTOs.ContestDTOs;
+using MIO.Core.DTOs.ProblemDTOs;
 using MIO2.Core.Entities;
 using MIO2.Core.Interfaces;
 
@@ -62,6 +63,14 @@ public ContestController(IContestService contestService)
     {
         var students= await _contestService.GetContestsStudents(contestId);
         return Ok(students);
+    }
+
+    [HttpGet("{contestId}/problems")]
+    [Authorize(Policy = "ContestOwnerOrAdmin")]
+    public async Task<ActionResult<List<ProblemResponseDTO>>> GetContestProblems(int contestId)
+    {
+        var problems = await _contestService.GetContestProblems(contestId);
+        return Ok(problems);
     }
     
     [HttpPut("{contestId}")]
