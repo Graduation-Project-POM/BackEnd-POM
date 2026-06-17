@@ -1,13 +1,17 @@
 ﻿using MIO.Core.Entities;
+using MIO.Core.Enums;
 
 namespace MIO2.Core.Entities
 {
     public class Gallery
     {
         public int Id { get; set; }
-        public string Url { get; set; } = null!;
         public string FileKey { get; set; } 
         public string? Title { get; set; }
+        
+        public MediaCategory Category { get; set; }
+        
+        public long? Size { get; set; }
         public char Type { get; set; }
         public string? Description { get; set; }
         public int UploadedByID { get; set; }

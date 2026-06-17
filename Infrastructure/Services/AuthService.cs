@@ -105,6 +105,7 @@ public class AuthService :IAuthService
             return false;
         
         user.RefreshTokenRevokedAt = DateTime.UtcNow;
+        _dbContext.SaveChanges(); 
         return true;
         
     }

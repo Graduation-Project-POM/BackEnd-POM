@@ -48,37 +48,33 @@ namespace MIO.API.Middlewares
         }
 
 
-        private async Task HandleException(HttpContext context,Exception ex)
+        private async Task HandleException(HttpContext context, Exception ex)
         {
-
-            var userId=context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+            var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
 
             _logger.LogError(ex,
-                 "Error occurred. UserId: {UserId}, Path: {Path}",
-                 userId,
-                 context.Request.Path
-                );
+                "Error occurred. UserId: {UserId}, Path: {Path}",
+                userId,
+                context.Request.Path
+            );
 
             context.Response.ContentType = "application/json";
 
-
-            var statusCode = ex switch
+            var (statusCode, message) = ex switch
             {
-                AppException appEx => appEx.StatusCode,
-                _ => StatusCodes.Status500InternalServerError
+                AppException appEx => (appEx.StatusCode, ex.Message),
+                _ => (StatusCodes.Status500InternalServerError, "An unexpected error occurred.") 
             };
-
 
             context.Response.StatusCode = statusCode;
 
             var response = new
             {
                 status = statusCode,
-                message = ex.Message
+                message
             };
 
             await context.Response.WriteAsJsonAsync(response);
-
         }
 
 

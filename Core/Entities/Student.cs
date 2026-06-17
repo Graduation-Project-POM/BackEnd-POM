@@ -19,5 +19,7 @@ namespace MIO.Core.Entities
         public User User { get; set; }
         
         public ICollection<ContestStudent> ContestStudents { get; set; } = [];
+        public ICollection<GroupStudent> GroupStudents { get; set; } = [];
+        public ICollection<ProblemStudent> ProblemStudents { get; set; } = [];
     }
 }

@@ -7,7 +7,7 @@ namespace MIO2.API.Authorization;
 // It does NOT contain logic.
 // It simply defines the requirement:
 // "Owner OR Admin can access the student resource."
-public class StudentOwnerOrAdminOrTrainerRequirement : IAuthorizationRequirement
+public class GroupMemberRequirment : IAuthorizationRequirement
 {
     
 }

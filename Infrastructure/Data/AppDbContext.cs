@@ -25,6 +25,10 @@ namespace MIO.Infrastructure
         public DbSet<Problem> Problems { get; set; }
         public DbSet<Contest> Contests { get; set; }
         public DbSet<ContestStudent>  ContestStudents { get; set; }
+        public DbSet<Group> Groups { get; set; }
+        public DbSet<GroupStudent> GroupStudents { get; set; }
+        public DbSet<GroupContest> GroupContests { get; set; }
+        public DbSet<ProblemStudent> ProblemStudents { get; set; }
         //راح اضيف الجداول بس لما نتفق عليهم ان شاء الله 
 
     }

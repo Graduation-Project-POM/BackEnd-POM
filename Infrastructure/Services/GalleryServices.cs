@@ -9,6 +9,8 @@ using MIO2.Core.DTOs.GalleryDtos;
 using MIO2.Core.Entities;
 using MIO2.Core.Interfaces;
 using System.Globalization;
+using MIO.Core.Enums;
+
 namespace MIO2.Infrastructure.Services
 {
     public class GalleryServices: IGalleryService
@@ -26,28 +28,30 @@ namespace MIO2.Infrastructure.Services
 
        
 
-        public async Task<Gallery> UploadMediaToGallery(CreateGalleryDTO galleryDTO, string url)
+        public async Task<Gallery> UploadMediaToGallery(CreateGalleryDTO galleryDTO)
         {
-            char Type;
-            
-            if (galleryDTO.FileKey.StartsWith("images/", StringComparison.OrdinalIgnoreCase))
-                Type = 'I';
-            else if (galleryDTO.FileKey.StartsWith("videos/",StringComparison.OrdinalIgnoreCase))
-                Type = 'V';
-            else
+            char type = galleryDTO.Category switch
             {
-                throw new AppException(
-                    "This content type is not supported.",
-                    StatusCodes.Status400BadRequest);
-            }
+                MediaCategory.GalleryVideo => 'V',
+
+                MediaCategory.UserProfile => 'I',
+                MediaCategory.QuestionImage => 'I',
+                MediaCategory.SolutionImage => 'I',
+                MediaCategory.GalleryImage => 'I',
+                MediaCategory.AnnouncementImage => 'I',
+
+                _ => throw new AppException(
+                    "Invalid media category",
+                    StatusCodes.Status400BadRequest)
+            };
             
 
             var Media = new Gallery
             {
-            Url= url,
             FileKey=galleryDTO.FileKey,
             Title= galleryDTO.Title,
-            Type= Type,
+            Type= type,
+            Category = galleryDTO.Category,
             Description= galleryDTO.Description,
             UploadedByID= _currentUser.UserId,
             RefType=galleryDTO.RefType,

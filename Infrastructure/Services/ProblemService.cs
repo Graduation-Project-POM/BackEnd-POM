@@ -153,4 +153,62 @@ public class ProblemService : IProblemServices
 
         return true;
     }
+    
+    
+    
+    public async Task<SubmitSolutionResponseDto> SubmitSolution(int problemId, SubmitSolutionDto dto)
+{
+    
+    var problem = await _context.Problems.FindAsync(problemId);
+    if (problem == null)
+        throw new AppException($"Problem with ID {problemId} not found", StatusCodes.Status404NotFound);
+
+   
+    var userId = _currentUser.UserId;
+    var student = await _context.Students.FirstOrDefaultAsync(s => s.UserId == userId);
+    if (student == null)
+        throw new AppException("Student not found for current user", StatusCodes.Status404NotFound);
+
+   
+    if (string.IsNullOrWhiteSpace(dto.SolutionText) && string.IsNullOrWhiteSpace(dto.PhotoFileKey))
+        throw new AppException("You must provide a solution text or a photo", StatusCodes.Status400BadRequest);
+
+    
+    if (!string.IsNullOrWhiteSpace(dto.PhotoFileKey))
+    {
+        // bool exists = await _s3Service.IsMediaExists(dto.PhotoFileKey);
+        // if (!exists)
+        //     throw new AppException("Photo file not found in storage", StatusCodes.Status404NotFound);
+    }
+
+    // check if already submitted
+    bool alreadySubmitted = await _context.ProblemStudents
+        .AnyAsync(ps => ps.ProblemId == problemId && ps.StudentId == student.Id);
+    if (alreadySubmitted)
+        throw new AppException("You have already submitted a solution for this problem", StatusCodes.Status409Conflict);
+
+    // var submission = new ProblemStudent
+    // {
+    //     ProblemId = problemId,
+    //     StudentId = student.Id,
+    //     SubmittedSolutionText = dto.SolutionText,
+    //     SubmittedSolutionPhotoKey = dto.PhotoFileKey
+    // };
+    
+    
+   // _context.ProblemStudents.Add(submission);
+    await _context.SaveChangesAsync();
+
+    return new SubmitSolutionResponseDto
+    {
+        // SubmissionId = submission.Id,
+        // ProblemId = submission.ProblemId,
+        // StudentId = submission.StudentId,
+        // SolutionText = submission.SubmittedSolutionText,
+        // PhotoUrl = string.IsNullOrEmpty(submission.SubmittedSolutionPhotoKey)
+        //     ? null
+        //     : _s3Service.GetPublicUrl(submission.SubmittedSolutionPhotoKey),
+        // SubmittedAt = submission.SubmittedAt
+    };
+}
 }

@@ -1,5 +1,6 @@
 ﻿using Amazon.S3.Model;
 using MIO.API.Settings;
+using MIO.Core.Enums;
 
 namespace MIO2.Infrastructure.Services
 {
@@ -31,28 +32,60 @@ namespace MIO2.Infrastructure.Services
                 region 
                 );
         }
-        
-        
-        public (string fileKey,string preSignedUrl) CreateUploadURL(string fileName, string contentType)
+
+        private void IsAllowedType( string contentType, MediaCategory category)
         {
-            if (String.IsNullOrWhiteSpace(fileName))
-                throw new ArgumentException("FileName is required.");
+            if (!AllowedTypes.TryGetValue(category, out var allowedForCategory))
+                throw new AppException("Invalid media category.", StatusCodes.Status400BadRequest);
+
+            if (!allowedForCategory.Contains(contentType))
+                throw new AppException($"Content type '{contentType}' is not allowed for this category.", StatusCodes.Status400BadRequest);
+
+          
+        }
+
+        private void IsSizeValid( string contentType, long size)
+        {
+            
+            if (contentType.StartsWith("image/") && size > 5 * 1024 * 1024)
+                throw new AppException("Image size must not exceed 5MB.", StatusCodes.Status400BadRequest);
+
+            if (contentType.StartsWith("video/") && size > 200 * 1024 * 1024)
+                throw new AppException("Video size must not exceed 200MB.", StatusCodes.Status400BadRequest);
+
+          
+        }
+        
+        public (string fileKey,string preSignedUrl) CreateUploadURL(string fileName, string contentType,
+                                                                     MediaCategory category, long size)
+        {
+            if (string.IsNullOrWhiteSpace(fileName))
+                throw new AppException("FileName is required.", StatusCodes.Status400BadRequest);
 
             if (string.IsNullOrWhiteSpace(contentType))
-                throw new ArgumentException("ContentType is required.");
+                throw new AppException("ContentType is required.", StatusCodes.Status400BadRequest);
 
-            string prefix="";
+            // Check category is in AllowedTypes and contentType is allowed for it
+            IsAllowedType(contentType, category);
 
-            if (contentType.StartsWith("image/",StringComparison.OrdinalIgnoreCase))
-                prefix = "images/";
-            else if (contentType.StartsWith("video/",StringComparison.OrdinalIgnoreCase))
-                prefix = "videos/";
-            else
+            // Size limits
+
+            IsSizeValid(contentType, size);
+
+            string prefix = category switch
             {
-                throw new AppException(
-                    "This content type is not supported.",
-                    StatusCodes.Status400BadRequest);
-            }
+                MediaCategory.UserProfile => "users/profile/",
+                MediaCategory.QuestionImage => "questions/images/",
+                MediaCategory.SolutionImage => "solutions/images/",
+                MediaCategory.GalleryImage => "gallery/images/",
+                MediaCategory.GalleryVideo => "gallery/videos/",
+                MediaCategory.AnnouncementImage => "announcements/images/",
+                MediaCategory.SubmissionAttachment => "submissions/",
+                _ => throw new AppException(
+                    "Invalid media category.",
+                    StatusCodes.Status400BadRequest)
+            };
+            
                 
             var ext = Path.GetExtension(fileName);
 
@@ -73,6 +106,18 @@ namespace MIO2.Infrastructure.Services
             return (fileKey, preSignedUrl);
             
         }
+        
+        private static readonly Dictionary<MediaCategory, string[]> AllowedTypes = new()
+        {
+            { MediaCategory.UserProfile,          new[] { "image/jpeg", "image/png", "image/webp" } },
+            { MediaCategory.QuestionImage,        new[] { "image/jpeg", "image/png", "image/webp" } },
+            { MediaCategory.SolutionImage,        new[] { "image/jpeg", "image/png", "image/webp" } },
+            { MediaCategory.GalleryImage,         new[] { "image/jpeg", "image/png", "image/webp" } },
+            { MediaCategory.AnnouncementImage,    new[] { "image/jpeg", "image/png", "image/webp" } },
+            { MediaCategory.GalleryVideo,         new[] { "video/mp4", "video/webm" } },
+            { MediaCategory.SubmissionAttachment, new[] { "image/jpeg", "image/png", "image/webp", "video/mp4", "video/webm" } },
+        };
+        
         
         public string GenerateSignedUrl(string fileKey)
         {

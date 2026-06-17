@@ -31,27 +31,8 @@ namespace MIO2.API.Controllers
         public async Task<ActionResult> UploadMediaRequest(
             [FromBody] CreateUploadUrlDto UploadDto)
         {
-            
-            var allowedImageTypes = new[] { "image/jpeg", "image/png", "image/webp" };
-            var allowedVideoTypes= new[] { "video/mp4", "video/webm" };
-            
-            if (!allowedImageTypes.Contains(UploadDto.ContentType) &&
-                !allowedVideoTypes.Contains(UploadDto.ContentType))
-                return BadRequest("Invalid file type.");
-        
-            
-            
-            if (allowedImageTypes.Contains(UploadDto.ContentType) &&
-                UploadDto.Size > 5 * 1024 * 1024  )
-                return BadRequest("File too large.");
-        
-            if(allowedVideoTypes.Contains(UploadDto.ContentType) &&
-               UploadDto.Size > 200 * 1024 * 1024)
-                return BadRequest("File too large.");
-            
-            
             var (fileKey, signedUrl) =_s3Service.CreateUploadURL(UploadDto.FileName,
-                UploadDto.ContentType);
+                UploadDto.ContentType,UploadDto.Category,UploadDto.Size);
             
             return Ok(new
             {
@@ -73,19 +54,12 @@ namespace MIO2.API.Controllers
             if(!await _s3Service.IsMediaExists(galleryDTO.FileKey))
                 return BadRequest("the file doesn't exist ");
             
-            var url=_s3Service.GetPublicUrl(galleryDTO.FileKey);
-
-         
-            
-            var Media=await _galleryService.UploadMediaToGallery(galleryDTO,url);
-
-            
+            var Media=await _galleryService.UploadMediaToGallery(galleryDTO);
             
             return Ok(new
                 {
                     message = "Media Uploaded Successfully",
                     MediatId = Media.Id,
-                    MediaUrl = Media.Url
                 }
             );
 
@@ -106,7 +80,7 @@ namespace MIO2.API.Controllers
               {
                   message = "Media Retrieved successfully",
                   MediaID = id,
-                  MediaUrl = Media.Url,
+                  MediaUrl = _s3Service.GenerateSignedUrl(Media.FileKey),
                   Title=Media.Title,
                   Type=Media.Type,
                   Description=Media.Description,

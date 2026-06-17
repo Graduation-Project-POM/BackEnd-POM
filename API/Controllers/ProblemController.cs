@@ -89,4 +89,14 @@ public class ProblemsController : ControllerBase
             ProblemId = id
         });
     }
+    
+    //قبل استخدامه بدنا نشوف اذا الطالب بعت صورة بدنا نستخدم UploadMediaRequest بالgallery بعدين الفرونت بده ينزل الصورة على الs3 وبعدين UploadAMediaInDbAfterUploadingInS3
+    [HttpPost("{id}/submit")]
+    [Authorize(Roles = "Student")]
+    public async Task<ActionResult> SubmitSolution(int id, SubmitSolutionDto dto)
+    {
+        var result = await _Problemservice.SubmitSolution(id, dto);
+        return Ok(result);
+    }
+    
 }

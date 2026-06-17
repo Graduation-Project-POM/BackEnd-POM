@@ -38,4 +38,5 @@ public class Problem
     public Trainer Trainer { get; set; }
     
     public ICollection<Contest> Contests { get; set; } = [];
+    public ICollection<ProblemStudent> ProblemStudents { get; set; } = [];
 }

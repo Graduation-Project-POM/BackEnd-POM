@@ -1,22 +1,20 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using MIO.Infrastructure;
+using System.Security.Claims;
 
 namespace MIO2.API.Authorization;
 
-using Microsoft.AspNetCore.Authorization;
-using System.Security.Claims;
-
-// This authorization handler enforces the ownership rule for student resources.
-// It checks whether the current user is either:
-// - An Admin (full access), OR
-// - The owner of the student record being requested
-public class StudentOwnerOrAdminOrTrainerHandler
-    : AuthorizationHandler<StudentOwnerOrAdminOrTrainerRequirement>
+// Checks whether the current user is either:
+// - An Admin or Trainer (full access), OR
+// - A Student who belongs to the requested group
+public class GroupMemberHandler
+    : AuthorizationHandler<GroupMemberRequirment>
 {
     private readonly IHttpContextAccessor _httpContextAccessor;
     private readonly AppDbContext _dbContext;
 
-    public StudentOwnerOrAdminOrTrainerHandler(
+    public GroupMemberHandler(
         IHttpContextAccessor httpContextAccessor,
         AppDbContext dbContext)
     {
@@ -24,9 +22,9 @@ public class StudentOwnerOrAdminOrTrainerHandler
         _dbContext = dbContext;
     }
 
-    protected async override Task HandleRequirementAsync(
+    protected override async Task HandleRequirementAsync(
         AuthorizationHandlerContext context,
-        StudentOwnerOrAdminOrTrainerRequirement requirement)
+        GroupMemberRequirment requirement)
     {
         if (context.User.IsInRole("Admin") || context.User.IsInRole("Trainer"))
         {
@@ -35,27 +33,23 @@ public class StudentOwnerOrAdminOrTrainerHandler
         }
 
         var httpContext = _httpContextAccessor.HttpContext!;
-        
-        // get the {id} from the route
-        var routeId = httpContext.Request.RouteValues["id"]?.ToString();
 
+        var routeId = httpContext.Request.RouteValues["id"]?.ToString();
         var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
 
         if (routeId == null || userId == null) return;
 
-        if (!int.TryParse(routeId, out int studentId) ||
+        if (!int.TryParse(routeId, out int groupId) ||
             !int.TryParse(userId, out int currentUserId)) return;
-        
-        var isOwner=await _dbContext.Students
-            .AnyAsync(s => s.Id == studentId && s.UserId == currentUserId);
-        
-        
-        if (isOwner)
+
+        // Check if the current user is a student that belongs to this group
+        var isMember = await _dbContext.GroupStudents
+            .AnyAsync(gs => gs.GroupId == groupId && gs.Student.UserId == currentUserId);
+
+        if (isMember)
         {
             context.Succeed(requirement);
             return;
         }
-
-        
     }
 }

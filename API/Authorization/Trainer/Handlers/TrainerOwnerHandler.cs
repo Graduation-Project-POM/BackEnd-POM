@@ -4,12 +4,12 @@ using Microsoft.AspNetCore.Authorization;
 using System.Security.Claims;
 
 
-public class TrainerOwnerOrAdminHandler
-    : AuthorizationHandler<TrainerOwnerOrAdminRequirement, int>
+public class TrainerOwnerHandler
+    : AuthorizationHandler<TrainerOwnerRequirement, int>
 {
     protected override Task HandleRequirementAsync(
         AuthorizationHandlerContext context,
-        TrainerOwnerOrAdminRequirement requirement,
+        TrainerOwnerRequirement requirement,
         int trainerId)
     {
         // Admin override

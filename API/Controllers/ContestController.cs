@@ -17,7 +17,9 @@ public ContestController(IContestService contestService)
 {
     _contestService = contestService;
 }
-[HttpPost]
+
+    [HttpPost]
+    [Authorize(Roles = "Trainer")]
     public async Task<ActionResult<Contest>> CreateContest(createContestDTO contestDto)
     {
         var Contest = await _contestService.CreateContest(contestDto);
@@ -31,6 +33,7 @@ public ContestController(IContestService contestService)
     }
     
     [HttpPost("{contestId}/students")]
+    [Authorize(Policy = "ContestOwnerOrAdmin")]
     public async Task<IActionResult> AddStudents(int contestId, [FromBody] AddStudentsToContestDTO dto)
     {
         var result = await _contestService.AddStudentToContest(contestId, dto);
@@ -38,6 +41,7 @@ public ContestController(IContestService contestService)
     }
     
     [HttpGet]
+    [Authorize(Roles = "Admin")]
     public async Task<ActionResult<List<ContestDTO>>> GetContests()
     {
         var contests = await _contestService.GetContests();
@@ -45,11 +49,35 @@ public ContestController(IContestService contestService)
     }
 
     [HttpGet("{contestId}")]
+    [Authorize(Policy = "ContestOwnerOrAdmin")]
     public async Task<ActionResult<ContestDTO>> GetContestById(int contestId)
     {
         var contest = await _contestService.GetContestById(contestId);
         return Ok(contest);
     }
+
+    [HttpGet("{contestId}/students")]
+    [Authorize(Policy = "ContestOwnerOrAdmin")]
+    public async Task<ActionResult<ContestsStudentsResponseDTO>> GetContestsStudents(int contestId)
+    {
+        var students= await _contestService.GetContestsStudents(contestId);
+        return Ok(students);
+    }
     
+    [HttpPut("{contestId}")]
+    [Authorize(Policy = "ContestOwnerOrAdmin")]
+    public async Task<IActionResult> UpdateContest(int contestId, UpdateContestDTO dto)
+    {
+        var result = await _contestService.UpdateContest(contestId, dto);
+        return Ok(result);
+    }
+    
+    [HttpDelete("{contestId}")]
+    [Authorize(Policy = "ContestOwnerOrAdmin")]
+    public async Task<IActionResult> DeleteContest(int contestId)
+    {
+        await _contestService.DeleteContest(contestId);
+        return NoContent(); // 204
+    }
     
 }

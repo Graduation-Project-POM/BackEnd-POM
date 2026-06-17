@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using MIO.API.Authentication;
 using MIO.Core.DTOs;
 using MIO.Core.Interfaces;
@@ -15,6 +16,7 @@ public class AuthController(JwtOptions jwtOptions,IUserService userServices, IAu
     
     [HttpPost]
     [Route("auth")]
+    [EnableRateLimiting("AuthLimiter")]
     [AllowAnonymous]
     public async Task<ActionResult<AuthResponseDTO>>AuthenticateUser([FromBody]AuthenticationRequest? request)
     {
@@ -40,6 +42,7 @@ public class AuthController(JwtOptions jwtOptions,IUserService userServices, IAu
     }
     
     [HttpPost("refresh")]
+    [EnableRateLimiting("AuthLimiter")]
     public IActionResult Refresh([FromBody] RefreshRequest request)
     {
         var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);

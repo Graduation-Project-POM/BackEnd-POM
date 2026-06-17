@@ -1,180 +1,66 @@
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.IdentityModel.Tokens;
+using MIO.API.Extensions;
 using MIO.API.Middlewares;
-using MIO.API.Settings;
-using MIO.Core.Interfaces;
 using MIO.Infrastructure;
 using MIO.Infrastructure.Services;
-using MIO2.API.Settings;
 using MIO2.Core.Events.EventBus;
-using MIO2.Core.Interfaces;
 using MIO2.Infrastructure.Events;
-using MIO2.Infrastructure.Services;
-using System;
-using System.Text;
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.OpenApi.Models;
-using MIO2.API.Authorization;
-using MIO2.API.Authorization.Trainer;
-using MIO.Core.Entities;       
-using MIO.Core.Enums;           
-using MIO.API.Authentication;
 
 var builder = WebApplication.CreateBuilder(args);
 
 
+// ======================================
+// Controllers
+// ======================================
+
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(options =>
-{
-    // ===============================
-    // 1) Define the JWT Bearer security scheme
-    // ===============================
-    //
-    // This tells Swagger that our API uses JWT Bearer authentication
-    // through the HTTP Authorization header.
-    options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
-    {
-        // The name of the HTTP header where the token will be sent.
-        Name = "Authorization",
 
 
-        // Indicates this is an HTTP authentication scheme.
-        Type = SecuritySchemeType.Http,
+// ======================================
+// Custom Extensions
+// ======================================
 
+builder.Services.AddDatabase(builder.Configuration);
 
-        // Specifies the authentication scheme name.
-        // Must be exactly "Bearer" for JWT Bearer tokens.
-        Scheme = "Bearer",
-
-
-        // Optional metadata to describe the token format.
-        BearerFormat = "JWT",
-
-
-        // Specifies that the token is sent in the request header.
-        In = ParameterLocation.Header,
-
-
-        // Text shown in Swagger UI to guide the user.
-        Description = "Enter: Bearer {your JWT token}"
-    });
-
-
-    // ===============================
-    // 2) Require the Bearer scheme for secured endpoints
-    // ===============================
-    //
-    // This tells Swagger that endpoints protected by [Authorize]
-    // require the Bearer token defined above.
-    options.AddSecurityRequirement(new OpenApiSecurityRequirement
-    {
-        {
-            new OpenApiSecurityScheme
-            {
-                // Reference the previously defined "Bearer" security scheme.
-                Reference = new OpenApiReference
-                {
-                    Type = ReferenceType.SecurityScheme,
-                    Id = "Bearer"
-                }
-            },
-
-
-            // No scopes are required for JWT Bearer authentication.
-            // This array is empty because JWT does not use OAuth scopes here.
-            new string[] {}
-        }
-    });
-});
-
-
-var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
-Console.WriteLine("CONNECTION STRING:");
-Console.WriteLine(builder.Configuration.GetConnectionString("DefaultConnection"));
-
-builder.Services.AddDbContext<AppDbContext>(options =>
-{
-    options.UseSqlServer(connectionString);
-});
-
-var jwtOptions = builder.Configuration.GetSection("Jwt").Get<JwtOptions>();
-var emailSettings = builder.Configuration.GetSection("Email").Get<EmailSettings>();
-var s3Settings= builder.Configuration.GetSection("AWS").Get<S3Settings>();
-
-//builder.Services.Configure<JwtOptions>(builder.Configuration.GetSection("Jwt"));
-
-//builder.Services.Configure<S3Settings>(builder.Configuration.GetSection("Email"));
-
-//builder.Services.Configure<S3Settings>(builder.Configuration.GetSection("AWS"));
-
-//services
-builder.Services.AddHttpContextAccessor();
-
-builder.Services.AddSingleton(jwtOptions);
-builder.Services.AddSingleton(emailSettings);
-builder.Services.AddSingleton(s3Settings);
-builder.Services.AddScoped<IUserService, UserServices>();
-builder.Services.AddScoped<ITrainerService, TrainerServices>();
-builder.Services.AddScoped<IStudentService, StudentServices>();
-builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 builder.Services.AddScoped<EmailService>();
-builder.Services.AddScoped<StudentAcceptedEmailHandler>();
-builder.Services.AddScoped<IEmailService, EmailService>();
-builder.Services.AddScoped<IS3Service, S3Service>();
-builder.Services.AddScoped<IProblemServices, ProblemService>();
-builder.Services.AddScoped<IContestService,ContestService>();
-builder.Services.AddScoped<IAuthService,AuthService>();
 
-builder.Services.AddScoped<IAuthorizationHandler, StudentOwnerOrAdminOrTrainerHandler>();
-builder.Services.AddSingleton<IAuthorizationHandler, TrainerOwnerOrAdminHandler >();
-builder.Services.AddHttpContextAccessor();
-builder.Services
-    .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
-    {
-        options.SaveToken = true;
-        options.TokenValidationParameters = new TokenValidationParameters
-        {
-            ValidateIssuer = true,
-            ValidIssuer = jwtOptions.Issuer,
-            ValidateAudience = true,
-            ValidAudience = jwtOptions.Audience,
-            ValidateIssuerSigningKey = true,
-            IssuerSigningKey = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(jwtOptions.signingkey))
-        };
-    });
+builder.Services.AddApplicationServices(builder.Configuration);
 
-builder.Services.AddAuthorization(options =>
-{
-    options.AddPolicy("StudentOwnerOrAdminOrTrainer", policy =>
-        policy.Requirements.Add(new StudentOwnerOrAdminOrTrainerRequirement()));
-});
+builder.Services.AddJwtAuthentication(builder.Configuration);
 
-builder.Services.AddAuthorization(options =>
-{
-    options.AddPolicy("TrainerOwnerOrAdmin", policy =>
-        policy.Requirements.Add(new TrainerOwnerOrAdminRequirement()));
-});
+builder.Services.AddCustomAuthorization();
+
+builder.Services.AddSwaggerDocumentation();
+
+builder.Services.AddApiRateLimiter();
 
 
+
+
+// // ======================================
+// // Cors Policy
+// // ======================================
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("MIOCorsPolicy", policy =>
+    options.AddPolicy("AllowFrontend", policy =>
     {
-        policy
-            .SetIsOriginAllowed(origin =>
-                Uri.TryCreate(origin, UriKind.Absolute, out var uri) &&
-                (uri.Host == "localhost" || uri.Host == "127.0.0.1"))
+        policy.WithOrigins("http://localhost:3000") // replace with your frontend URL
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
 });
 
+
+// ======================================
+// Build App
+// ======================================
+
 var app = builder.Build();
 
+
+// ======================================
+// Swagger
+// ======================================
 
 if (app.Environment.IsDevelopment())
 {
@@ -183,6 +69,9 @@ if (app.Environment.IsDevelopment())
 }
 
 
+// ======================================
+// Event Subscriptions
+// ======================================
 
 using (var scope = app.Services.CreateScope())
 {
@@ -192,60 +81,38 @@ using (var scope = app.Services.CreateScope())
     studentEvents.Accepted += emailHandler.Handle;
 }
 
-using (var scope = app.Services.CreateScope())
-{
-    try
-    {
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        Security.CreatePasswordHash("Admin1234", out byte[] hash, out byte[] salt);
 
-        var admin = db.Users.FirstOrDefault(u => u.UserName == "admin");
-        if (admin == null)
-        {
-            db.Users.Add(new User
-            {
-                FirstName = "System",
-                MiddleName = "",
-                LastName = "Admin",
-                Email = "admin@pmo.ps",
-                UserName = "admin",
-                PasswordHash = hash,
-                PasswordSalt = salt,
-                PhoneNumber = null,
-                Gender = "male",
-                ProfileImageUrl = "",
-                IsActive = true,
-                CreatedAt = DateTime.UtcNow,
-                LastUpdatedAt = DateTime.UtcNow,
-                RoleID = Role.Admin
-            });
-        }
-        else
-        {
-            admin.PasswordHash = hash;
-            admin.PasswordSalt = salt;
-            admin.RoleID = Role.Admin;
-            admin.IsActive = true;
-        }
 
-        db.SaveChanges();
-    }
-    catch (Exception ex)
-    {
-        app.Logger.LogError(ex, "Admin seeding failed");
-    }
-}
+
+// ======================================
+// Middlewares
+// ======================================
 
 app.UseMiddleware<ExceptionMiddleWare>();
+
 app.UseHttpsRedirection();
-app.UseRouting();
-app.UseCors("MIOCorsPolicy");
+
+app.UseCors("AllowFrontend");
+
+app.UseRateLimiter();
+
+//app.UseRateLimiterWithMessage();
+
 app.UseAuthentication();
+
 app.UseAuthorization();
+
+
+// ======================================
+// Endpoints
+// ======================================
 
 app.MapControllers();
 
 
+// ======================================
+// Run App
+// ======================================
 
 app.Run();

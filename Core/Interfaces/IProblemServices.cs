@@ -9,4 +9,5 @@ public interface IProblemServices
     Task<int> Create(CreateProblemDto dto);
     Task<bool> Update(int id, UpdateProblemDto dto);
     Task<bool> Delete(int id);
+    Task<SubmitSolutionResponseDto> SubmitSolution(int problemId, SubmitSolutionDto dto);
 }
