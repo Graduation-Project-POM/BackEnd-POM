@@ -19,7 +19,7 @@ public ContestController(IContestService contestService)
 }
 
     [HttpPost]
-    [Authorize(Roles = "Trainer")]
+    [Authorize(Roles = "Admin,Trainer")]
     public async Task<ActionResult<Contest>> CreateContest(createContestDTO contestDto)
     {
         var Contest = await _contestService.CreateContest(contestDto);

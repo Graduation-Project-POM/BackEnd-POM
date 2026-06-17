@@ -67,9 +67,11 @@ public class ProblemService : IProblemServices
     public async Task<int> Create(CreateProblemDto dto)
     {
        var userID=_currentUser.UserId;
+       var isAdmin = _currentUser.Role == "Admin";
        var trainer=await _context.Trainers.FirstOrDefaultAsync(t => t.UserId == userID);
-       
-        if (trainer==null)
+
+        // Trainers own the problems they create; admins may also create (no owner).
+        if (trainer==null && !isAdmin)
         {
             throw new AppException(
                 "Invalid TrainerID. Trainer does not exist.",
@@ -91,7 +93,7 @@ public class ProblemService : IProblemServices
             Difficulty = dto.Difficulty,
             Topic = dto.Topic,
             PhotoFileKey = dto.PhotoFileKey,
-            TrainerID = trainer.Id,
+            TrainerID = trainer?.Id,
             IsPublished = dto.IsPublished,
             CreatedAt = DateTime.UtcNow
         };

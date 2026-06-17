@@ -9,8 +9,8 @@ public class Contest
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
     
-    public int TrainerId { get; set; }
-    public Trainer trainer { get; set; }
+    public int? TrainerId { get; set; }
+    public Trainer? trainer { get; set; }
     
     
     public ContestStatus Status { get; set; } = ContestStatus.Upcoming;
