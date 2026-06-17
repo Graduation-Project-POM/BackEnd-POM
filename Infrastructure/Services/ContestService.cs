@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MIO.API.Settings;
 using MIO.Core.DTOs.ContestDTOs;
+using MIO.Core.DTOs.ProblemDTOs;
 using MIO.Core.Interfaces;
 using MIO.Infrastructure;
 using MIO.Infrastructure.Services;
@@ -25,11 +26,15 @@ public class ContestService:IContestService
     
     public async Task<Contest> CreateContest(createContestDTO createContestDTO)
     {
-        var trainerId =await  _dbContext.Trainers.Where(t => t.UserId == _currentUser.UserId).
-            Select(t => t.Id).
-            FirstOrDefaultAsync();
+        var isAdmin = _currentUser.Role == "Admin";
 
-        if (trainerId == 0)
+        var trainerId = await _dbContext.Trainers
+            .Where(t => t.UserId == _currentUser.UserId)
+            .Select(t => (int?)t.Id)
+            .FirstOrDefaultAsync();
+
+        // Trainers own the contests they create; admins may also create (no owner).
+        if (trainerId == null && !isAdmin)
         {
             throw new AppException($"You must be a Trainer to create a contest", StatusCodes.Status403Forbidden);
         }
@@ -118,7 +123,7 @@ public class ContestService:IContestService
                 Status = c.Status,
                 StartAt = c.StartAt,
                 EndAt = c.EndAt,
-                TrainerId = c.TrainerId,
+                TrainerId = c.TrainerId ?? 0,
                 ProblemCount = c.Problems.Count,
                 StudentCount = c.ContestStudents.Count
             })
@@ -137,7 +142,7 @@ public class ContestService:IContestService
                 Status = c.Status,
                 StartAt = c.StartAt,
                 EndAt = c.EndAt,
-                TrainerId = c.TrainerId,
+                TrainerId = c.TrainerId ?? 0,
                 ProblemCount = c.Problems.Count,
                 StudentCount = c.ContestStudents.Count
             })
@@ -179,14 +184,38 @@ public class ContestService:IContestService
     }
     
     
+    public async Task<List<ProblemResponseDTO>> GetContestProblems(int contestId)
+    {
+        var exists = await _dbContext.Contests.AnyAsync(c => c.Id == contestId);
+        if (!exists)
+            throw new AppException($"Contest with ID {contestId} not found", StatusCodes.Status404NotFound);
+
+        return await _dbContext.Contests
+            .Where(c => c.Id == contestId)
+            .SelectMany(c => c.Problems)
+            .Select(p => new ProblemResponseDTO
+            {
+                ID = p.ID,
+                Title = p.Title,
+                Difficulty = p.Difficulty,
+                Topic = p.Topic,
+                PhotoUrl = p.PhotoFileKey,
+                IsPublished = p.IsPublished
+            })
+            .ToListAsync();
+    }
+
+
     public async Task<ContestDTO> UpdateContest(int contestId, UpdateContestDTO dto)
     {
+        var isAdmin = _currentUser.Role == "Admin";
+
         var trainerId = await _dbContext.Trainers
             .Where(t => t.UserId == _currentUser.UserId)
-            .Select(t => t.Id)
+            .Select(t => (int?)t.Id)
             .FirstOrDefaultAsync();
 
-        if (trainerId == 0)
+        if (trainerId == null && !isAdmin)
             throw new AppException("You must be a Trainer to update a contest", StatusCodes.Status403Forbidden);
 
         var contest = await _dbContext.Contests
@@ -196,7 +225,7 @@ public class ContestService:IContestService
         if (contest == null)
             throw new AppException($"Contest with ID {contestId} not found", StatusCodes.Status404NotFound);
 
-        if (contest.TrainerId != trainerId)
+        if (!isAdmin && contest.TrainerId != trainerId)
             throw new AppException("You are not authorized to update this contest", StatusCodes.Status403Forbidden);
 
         // Update scalar fields only if provided (partial update)
@@ -235,7 +264,7 @@ public class ContestService:IContestService
             Status = contest.Status,
             StartAt = contest.StartAt,
             EndAt = contest.EndAt,
-            TrainerId = contest.TrainerId,
+            TrainerId = contest.TrainerId ?? 0,
             ProblemCount = contest.Problems.Count,
             StudentCount = contest.ContestStudents?.Count ?? 0
         };
@@ -244,12 +273,14 @@ public class ContestService:IContestService
     
     public async Task DeleteContest(int contestId)
     {
+        var isAdmin = _currentUser.Role == "Admin";
+
         var trainerId = await _dbContext.Trainers
             .Where(t => t.UserId == _currentUser.UserId)
-            .Select(t => t.Id)
+            .Select(t => (int?)t.Id)
             .FirstOrDefaultAsync();
 
-        if (trainerId == 0)
+        if (trainerId == null && !isAdmin)
             throw new AppException("You must be a Trainer to delete a contest", StatusCodes.Status403Forbidden);
 
         var contest = await _dbContext.Contests
@@ -258,7 +289,7 @@ public class ContestService:IContestService
         if (contest == null)
             throw new AppException($"Contest with ID {contestId} not found", StatusCodes.Status404NotFound);
 
-        if (contest.TrainerId != trainerId)
+        if (!isAdmin && contest.TrainerId != trainerId)
             throw new AppException("You are not authorized to delete this contest", StatusCodes.Status403Forbidden);
 
         _dbContext.Contests.Remove(contest);

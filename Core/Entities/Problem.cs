@@ -32,10 +32,10 @@ public class Problem
     public bool IsPublished { get; set; }
 
    
-    public int TrainerID { get; set; }
+    public int? TrainerID { get; set; }
 
     [ForeignKey(nameof(TrainerID))]
-    public Trainer Trainer { get; set; }
+    public Trainer? Trainer { get; set; }
     
     public ICollection<Contest> Contests { get; set; } = [];
     public ICollection<ProblemStudent> ProblemStudents { get; set; } = [];
