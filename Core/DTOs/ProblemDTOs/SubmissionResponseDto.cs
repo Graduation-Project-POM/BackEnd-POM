@@ -12,6 +12,8 @@ public class SubmissionResponseDto
     public string? SolutionText { get; set; }
     public string? PhotoUrl { get; set; }
     public int? Grade { get; set; }
+    public string? Feedback { get; set; }
+    public DateTime? GradedAt { get; set; }
     public DateTime SubmittedAt { get; set; }
 
     public string? ProblemTitle { get; set; }

@@ -73,7 +73,8 @@ namespace MIO.API.Controllers
 
         [HttpGet]
         [Route("{id}")]
-        [Authorize(Policy = "StudentOwnerOrAdminOrTrainer")]
+        // Profile viewing is open to any authenticated user (View Profile feature).
+        [Authorize]
         public async Task<ActionResult> GetStudentById(int id)
         {
             var student = await _studentService.GetStudentByIDService(id);

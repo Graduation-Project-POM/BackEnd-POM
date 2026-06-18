@@ -43,7 +43,8 @@ namespace MIO.API.Controllers
 
         [HttpGet]
         [Route("{id}")]
-        [Authorize(Roles ="Admin")]
+        // Profile viewing is open to any authenticated user (View Profile feature).
+        [Authorize]
         public async Task<ActionResult> GetTrainerById(int id)
         {
             var user = await trainerService.GetTrainerByIDService(id);

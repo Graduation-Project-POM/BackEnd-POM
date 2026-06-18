@@ -134,12 +134,25 @@ public class GroupService(AppDbContext db, ICurrentUserService currentUser) : IG
 
         await EnsureCanViewGroupAsync(groupId);
 
+        // Problems that belong to this group's contests — the pool a member's
+        // "solved" count is measured against.
+        var groupProblemIds = await db.GroupContests
+            .Where(gc => gc.GroupId == groupId)
+            .SelectMany(gc => gc.Contest.Problems.Select(p => p.ID))
+            .Distinct()
+            .ToListAsync();
+
         return await db.GroupStudents
             .Where(gs => gs.GroupId == groupId)
             .Select(gs => new GroupStudentDto(
                 gs.StudentId,
                 gs.Student.User.UserName,
-                gs.JoinDate
+                gs.JoinDate,
+                // Real count: problems in this group's contests the student
+                // has submitted a solution for.
+                db.ProblemStudents.Count(ps =>
+                    ps.StudentId == gs.StudentId &&
+                    groupProblemIds.Contains(ps.ProblemId))
             ))
             .ToListAsync();
     }

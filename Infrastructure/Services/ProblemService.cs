@@ -308,6 +308,8 @@ public class ProblemService : IProblemServices
                 SolutionText = ps.SubmittedSolutionText,
                 PhotoUrl = ps.SubmittedSolutionPhotoKey,
                 Grade = ps.Grade,
+                Feedback = ps.Feedback,
+                GradedAt = ps.GradedAt,
                 SubmittedAt = ps.SubmittedAt
             })
             .ToListAsync();
@@ -323,6 +325,7 @@ public class ProblemService : IProblemServices
             throw new AppException($"Submission with ID {submissionId} not found", StatusCodes.Status404NotFound);
 
         submission.Grade = dto.Grade;
+        submission.Feedback = dto.Feedback;
         submission.GradedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
@@ -336,6 +339,8 @@ public class ProblemService : IProblemServices
             SolutionText = submission.SubmittedSolutionText,
             PhotoUrl = submission.SubmittedSolutionPhotoKey,
             Grade = submission.Grade,
+            Feedback = submission.Feedback,
+            GradedAt = submission.GradedAt,
             SubmittedAt = submission.SubmittedAt
         };
     }
@@ -361,6 +366,8 @@ public class ProblemService : IProblemServices
                 SolutionText = ps.SubmittedSolutionText,
                 PhotoUrl = ps.SubmittedSolutionPhotoKey,
                 Grade = ps.Grade,
+                Feedback = ps.Feedback,
+                GradedAt = ps.GradedAt,
                 SubmittedAt = ps.SubmittedAt,
                 ProblemTitle = ps.Problem.Title,
                 ProblemTopic = ps.Problem.Topic,

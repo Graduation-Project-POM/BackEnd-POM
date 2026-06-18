@@ -64,17 +64,8 @@ namespace MIO.Infrastructure.Services
                    , StatusCodes.Status404NotFound);
 
             
-            var currentUserId = _currentUser.UserId;
-            
-            var currentUserRole = _currentUser.Role;
-            
-            bool isAdmin = currentUserRole == "Admin";
-            
-            // Ownership check
-            if (trainer.UserId != currentUserId && !isAdmin)
-                throw new AppException(
-                    "You dont have permission to see this student!",
-                    StatusCodes.Status403Forbidden);
+            // Profile viewing is open to any authenticated user (View Profile
+            // feature): a student must be able to see their group's trainer.
             
             
             return new TrainerResponseDTO

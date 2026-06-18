@@ -6,7 +6,11 @@ public record GroupStudentDto(
     [Required]
     int StudentId,
     [Required]
-    string FullName,  
+    string FullName,
     [Required]
-    DateOnly JoinDate
+    DateOnly JoinDate,
+    // Number of problems in this group's contests the student has solved
+    // (submitted a solution for). Real, derived from ProblemStudents.
+    [Required]
+    int ProblemSolved
 );
