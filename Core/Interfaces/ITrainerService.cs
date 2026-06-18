@@ -15,5 +15,8 @@ namespace MIO.Core.Interfaces
         Task<Trainer?> UpdateTrainerService(int id, UpdateTrainerDTO trainerDTO);
 
        Task<Trainer?> DeleteTrainerService(int id);
+
+       Task<TrainerResponseDTO?> GetMyTrainerService();
+       Task<Trainer?> UpdateMyTrainerService(UpdateTrainerDTO trainerDTO);
     }
 }
