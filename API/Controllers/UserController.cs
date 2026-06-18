@@ -52,12 +52,34 @@ namespace MIO.API.Controllers
         }
 
 
+        [HttpGet("me")]
+        [Authorize]
+        public async Task<ActionResult> GetCurrentUser()
+        {
+            return Ok(await userServices.GetCurrentUserService());
+        }
+
+        [HttpPut("me")]
+        [Authorize]
+        public async Task<ActionResult> UpdateCurrentUser(UpdateUserDTO userDTO)
+        {
+            if (userDTO == null)
+                return BadRequest("User data cannot be null");
+
+            var updated = await userServices.UpdateCurrentUserService(userDTO);
+            return Ok(new
+            {
+                message = "Profile updated successfully",
+                userId = updated!.Id
+            });
+        }
+
         [HttpGet]
         [Route("{id}")]
         [Authorize(Roles ="Admin")]
         public async Task<ActionResult> GetUserById(int id)
         {
-            var  user= await userServices.GetUserByIDService(id);   
+            var  user= await userServices.GetUserByIDService(id);
             return Ok(user);
         }
 

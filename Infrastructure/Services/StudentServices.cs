@@ -196,6 +196,78 @@ namespace MIO.Infrastructure.Services
             return existingStudent;
         }
 
+        // Resolve (or auto-create) the Student profile for the logged-in user.
+        private async Task<Student> GetOrCreateCurrentStudent()
+        {
+            var userId = _currentUser.UserId;
+            var student = await _dbContext.Students
+                .Include(s => s.User)
+                .FirstOrDefaultAsync(s => s.UserId == userId);
+
+            if (student == null)
+            {
+                var user = await _dbContext.Users.FindAsync(userId);
+                if (user == null || user.RoleID != Role.Student)
+                    throw new AppException("Only students have a student profile", StatusCodes.Status403Forbidden);
+
+                student = new Student
+                {
+                    UserId = userId,
+                    GradeLevel = "",
+                    City = "",
+                    SchoolName = "",
+                    NationalId = "",
+                    IsAccepted = true
+                };
+                _dbContext.Students.Add(student);
+                await _dbContext.SaveChangesAsync();
+                student.User = user;
+            }
+
+            return student;
+        }
+
+        private static StudentResponseDTO MapToResponse(Student student) => new StudentResponseDTO
+        {
+            Id = student.Id,
+            GradeLevel = student.GradeLevel,
+            City = student.City,
+            SchoolName = student.SchoolName,
+            NationalId = student.NationalId,
+            ProblemSolved = student.ProblemSolved,
+            Score = student.Score,
+            JoinYear = student.JoinYear,
+            IsAccepted = student.IsAccepted,
+            BasicUser = student.User == null ? null! : new BasicUserDTO
+            {
+                Id = student.UserId,
+                FirstName = student.User.FirstName,
+                LastName = student.User.LastName,
+                Email = student.User.Email,
+                UserName = student.User.UserName,
+                PhoneNumber = student.User.PhoneNumber
+            }
+        };
+
+        public async Task<StudentResponseDTO?> GetMyStudentService()
+        {
+            var student = await GetOrCreateCurrentStudent();
+            return MapToResponse(student);
+        }
+
+        public async Task<Student?> UpdateMyStudentService(UpdateStudentDTO studentDTO)
+        {
+            var student = await GetOrCreateCurrentStudent();
+
+            student.GradeLevel = studentDTO.GradeLevel;
+            student.City = studentDTO.City;
+            student.SchoolName = studentDTO.SchoolName;
+            student.NationalId = studentDTO.NationalId;
+
+            await _dbContext.SaveChangesAsync();
+            return student;
+        }
+
         public async Task<Student?> DeleteStudentService(int id)
         {
             var existingStudent = await _dbContext.Students.FindAsync(id);

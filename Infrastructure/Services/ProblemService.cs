@@ -3,8 +3,10 @@ using Microsoft.EntityFrameworkCore;
 using MIO.API.Settings;
 using MIO.Core.DTOs.ProblemDTOs;
 using MIO.Core.Entities;
+using MIO.Core.Enums;
 using MIO.Core.Interfaces;
 using MIO.Infrastructure;
+using MIO2.Core.Entities;
 using MIO2.Core.Interfaces;
 
 public class ProblemService : IProblemServices
@@ -30,23 +32,78 @@ public class ProblemService : IProblemServices
     {
        
 
-        return await _context.Problems.Select(p => new ProblemResponseDTO
+        var role = _currentUser.Role;
+        var isAdmin = role == "Admin";
+
+        int? myTrainerId = null;
+        if (role == "Trainer")
+        {
+            var trainer = await _context.Trainers
+                .FirstOrDefaultAsync(t => t.UserId == _currentUser.UserId);
+            myTrainerId = trainer?.Id;
+        }
+
+        var query = _context.Problems.AsQueryable();
+
+        if (role == "Student")
+        {
+            // Students only see published problems.
+            query = query.Where(p => p.IsPublished);
+        }
+        else if (role == "Trainer")
+        {
+            // Trainers see published problems plus their own drafts (not other trainers').
+            query = query.Where(p => p.IsPublished || (myTrainerId != null && p.TrainerID == myTrainerId));
+        }
+        // Admins see everything (published + all drafts).
+
+        return await query.Select(p => new ProblemResponseDTO
         {
             ID = p.ID,
             Title = p.Title,
+            Statement = p.Statement,
             Difficulty = p.Difficulty,
             //PhotoUrl = string.IsNullOrEmpty(p.PhotoFileKey) ? null : _s3Service.GetPublicUrl(p.PhotoFileKey),
             Topic = p.Topic,
-            IsPublished = p.IsPublished
-            
+            IsPublished = p.IsPublished,
+            PublisherName = p.Trainer != null ? p.Trainer.User.FirstName + " " + p.Trainer.User.LastName : null,
+            CanModify = isAdmin || (myTrainerId != null && p.TrainerID == myTrainerId)
+
         })   .ToListAsync();;
     }
 
     public async Task<ProblemResponseDTO> GetById(int id)
     {
-        var p = await _context.Problems.FindAsync(id);
+        var p = await _context.Problems
+            .Include(x => x.Trainer).ThenInclude(t => t.User)
+            .FirstOrDefaultAsync(x => x.ID == id);
 
         if (p == null)
+        {
+            throw new AppException(
+                $"Problem with ID {id} not found",
+                StatusCodes.Status404NotFound);
+        }
+
+        var role = _currentUser.Role;
+        var isAdmin = role == "Admin";
+        int? myTrainerId = null;
+        if (role == "Trainer")
+        {
+            myTrainerId = (await _context.Trainers
+                .FirstOrDefaultAsync(t => t.UserId == _currentUser.UserId))?.Id;
+        }
+
+        // Students only see published problems.
+        if (role == "Student" && !p.IsPublished)
+        {
+            throw new AppException(
+                $"Problem with ID {id} not found",
+                StatusCodes.Status404NotFound);
+        }
+
+        // Trainers can only open a draft they created.
+        if (role == "Trainer" && !p.IsPublished && (myTrainerId == null || p.TrainerID != myTrainerId))
         {
             throw new AppException(
                 $"Problem with ID {id} not found",
@@ -57,9 +114,12 @@ public class ProblemService : IProblemServices
         {
             ID = p.ID,
             Title = p.Title,
+            Statement = p.Statement,
             Difficulty = p.Difficulty,
             Topic = p.Topic,
             IsPublished = p.IsPublished,
+            PublisherName = p.Trainer != null ? p.Trainer.User.FirstName + " " + p.Trainer.User.LastName : null,
+            CanModify = isAdmin || (myTrainerId != null && p.TrainerID == myTrainerId),
             //PhotoUrl = string.IsNullOrEmpty(p.PhotoFileKey) ? null : _s3Service.GetPublicUrl(p.PhotoFileKey)
         };
     }
@@ -71,11 +131,22 @@ public class ProblemService : IProblemServices
        var trainer=await _context.Trainers.FirstOrDefaultAsync(t => t.UserId == userID);
 
         // Trainers own the problems they create; admins may also create (no owner).
-        if (trainer==null && !isAdmin)
+        if (trainer == null && !isAdmin)
         {
-            throw new AppException(
-                "Invalid TrainerID. Trainer does not exist.",
-                StatusCodes.Status404NotFound);
+            // A Trainer-role user may not have a Trainer profile row yet (profiles are
+            // created separately). Auto-provision a minimal one so they can create problems.
+            if (_currentUser.Role == "Trainer")
+            {
+                trainer = new Trainer { UserId = userID, Specialization = "" };
+                _context.Trainers.Add(trainer);
+                await _context.SaveChangesAsync();
+            }
+            else
+            {
+                throw new AppException(
+                    "Invalid TrainerID. Trainer does not exist.",
+                    StatusCodes.Status404NotFound);
+            }
         }
 
       
@@ -89,7 +160,7 @@ public class ProblemService : IProblemServices
         var problem = new Problem
         {
             Title = dto.Title,
-            Statement = dto.Statement,
+            Statement = dto.Statement ?? "",
             Difficulty = dto.Difficulty,
             Topic = dto.Topic,
             PhotoFileKey = dto.PhotoFileKey,
@@ -124,7 +195,7 @@ public class ProblemService : IProblemServices
         }
         
         problem.Title = dto.Title;
-        problem.Statement = dto.Statement;
+        problem.Statement = dto.Statement ?? problem.Statement;
         problem.Difficulty = dto.Difficulty;
         problem.Topic = dto.Topic;
         problem.IsPublished = dto.IsPublished;
@@ -147,9 +218,22 @@ public class ProblemService : IProblemServices
                 StatusCodes.Status404NotFound);
         }
 
+        // Trainers may only delete problems they created; admins can delete any.
+        if (_currentUser.Role == "Trainer")
+        {
+            var trainer = await _context.Trainers
+                .FirstOrDefaultAsync(t => t.UserId == _currentUser.UserId);
+            if (trainer == null || problem.TrainerID != trainer.Id)
+            {
+                throw new AppException(
+                    "You can only delete problems you created",
+                    StatusCodes.Status403Forbidden);
+            }
+        }
+
         // if (!string.IsNullOrEmpty(problem.PhotoFileKey))
         //     await _s3Service.DeleteMediaAsync(problem.PhotoFileKey);
-        
+
         _context.Problems.Remove(problem);
         await _context.SaveChangesAsync();
 
@@ -159,58 +243,146 @@ public class ProblemService : IProblemServices
     
     
     public async Task<SubmitSolutionResponseDto> SubmitSolution(int problemId, SubmitSolutionDto dto)
-{
-    
-    var problem = await _context.Problems.FindAsync(problemId);
-    if (problem == null)
-        throw new AppException($"Problem with ID {problemId} not found", StatusCodes.Status404NotFound);
-
-   
-    var userId = _currentUser.UserId;
-    var student = await _context.Students.FirstOrDefaultAsync(s => s.UserId == userId);
-    if (student == null)
-        throw new AppException("Student not found for current user", StatusCodes.Status404NotFound);
-
-   
-    if (string.IsNullOrWhiteSpace(dto.SolutionText) && string.IsNullOrWhiteSpace(dto.PhotoFileKey))
-        throw new AppException("You must provide a solution text or a photo", StatusCodes.Status400BadRequest);
-
-    
-    if (!string.IsNullOrWhiteSpace(dto.PhotoFileKey))
     {
-        // bool exists = await _s3Service.IsMediaExists(dto.PhotoFileKey);
-        // if (!exists)
-        //     throw new AppException("Photo file not found in storage", StatusCodes.Status404NotFound);
+        var problem = await _context.Problems.FindAsync(problemId);
+        if (problem == null)
+            throw new AppException($"Problem with ID {problemId} not found", StatusCodes.Status404NotFound);
+
+        var userId = _currentUser.UserId;
+        var student = await _context.Students.FirstOrDefaultAsync(s => s.UserId == userId);
+
+        // A Student-role user may not yet have a Student profile row (profiles are
+        // created separately). Auto-provision a minimal one so they can submit.
+        if (student == null)
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null || user.RoleID != Role.Student)
+                throw new AppException("Only students can submit solutions", StatusCodes.Status403Forbidden);
+
+            student = new Student
+            {
+                UserId = userId,
+                GradeLevel = "",
+                City = "",
+                SchoolName = "",
+                NationalId = "",
+                IsAccepted = true
+            };
+            _context.Students.Add(student);
+            await _context.SaveChangesAsync();
+        }
+
+        if (string.IsNullOrWhiteSpace(dto.SolutionText) && string.IsNullOrWhiteSpace(dto.PhotoFileKey))
+            throw new AppException("You must provide a solution text or a photo", StatusCodes.Status400BadRequest);
+
+        // One submission per student per problem.
+        bool alreadySubmitted = await _context.ProblemStudents
+            .AnyAsync(ps => ps.ProblemId == problemId && ps.StudentId == student.Id);
+        if (alreadySubmitted)
+            throw new AppException("You have already submitted a solution for this problem", StatusCodes.Status409Conflict);
+
+        var submission = new ProblemStudent
+        {
+            ProblemId = problemId,
+            StudentId = student.Id,
+            SubmittedSolutionText = dto.SolutionText,
+            SubmittedSolutionPhotoKey = dto.PhotoFileKey,
+            SubmittedAt = DateTime.UtcNow
+        };
+
+        _context.ProblemStudents.Add(submission);
+        await _context.SaveChangesAsync();
+
+        return new SubmitSolutionResponseDto
+        {
+            SubmissionId = submission.Id,
+            ProblemId = submission.ProblemId,
+            StudentId = submission.StudentId,
+            SolutionText = submission.SubmittedSolutionText,
+            PhotoUrl = submission.SubmittedSolutionPhotoKey,
+            SubmittedAt = submission.SubmittedAt
+        };
     }
 
-    // check if already submitted
-    bool alreadySubmitted = await _context.ProblemStudents
-        .AnyAsync(ps => ps.ProblemId == problemId && ps.StudentId == student.Id);
-    if (alreadySubmitted)
-        throw new AppException("You have already submitted a solution for this problem", StatusCodes.Status409Conflict);
-
-    // var submission = new ProblemStudent
-    // {
-    //     ProblemId = problemId,
-    //     StudentId = student.Id,
-    //     SubmittedSolutionText = dto.SolutionText,
-    //     SubmittedSolutionPhotoKey = dto.PhotoFileKey
-    // };
-    
-    
-   // _context.ProblemStudents.Add(submission);
-    await _context.SaveChangesAsync();
-
-    return new SubmitSolutionResponseDto
+    public async Task<IEnumerable<SubmissionResponseDto>> GetSubmissions(int problemId)
     {
-        // SubmissionId = submission.Id,
-        // ProblemId = submission.ProblemId,
-        // StudentId = submission.StudentId,
-        // SolutionText = submission.SubmittedSolutionText,
-        // PhotoUrl = string.IsNullOrEmpty(submission.SubmittedSolutionPhotoKey)
-        //     ? null
-        //     : _s3Service.GetPublicUrl(submission.SubmittedSolutionPhotoKey),
-        // SubmittedAt = submission.SubmittedAt
-    };
-}
+        var exists = await _context.Problems.AnyAsync(p => p.ID == problemId);
+        if (!exists)
+            throw new AppException($"Problem with ID {problemId} not found", StatusCodes.Status404NotFound);
+
+        return await _context.ProblemStudents
+            .Where(ps => ps.ProblemId == problemId)
+            .Include(ps => ps.Student).ThenInclude(s => s.User)
+            .OrderByDescending(ps => ps.SubmittedAt)
+            .Select(ps => new SubmissionResponseDto
+            {
+                Id = ps.Id,
+                ProblemId = ps.ProblemId,
+                StudentId = ps.StudentId,
+                StudentName = ps.Student.User.FirstName + " " + ps.Student.User.LastName,
+                StudentEmail = ps.Student.User.Email,
+                SolutionText = ps.SubmittedSolutionText,
+                PhotoUrl = ps.SubmittedSolutionPhotoKey,
+                Grade = ps.Grade,
+                SubmittedAt = ps.SubmittedAt
+            })
+            .ToListAsync();
+    }
+
+    public async Task<SubmissionResponseDto> GradeSubmission(int submissionId, GradeSubmissionDto dto)
+    {
+        var submission = await _context.ProblemStudents
+            .Include(ps => ps.Student).ThenInclude(s => s.User)
+            .FirstOrDefaultAsync(ps => ps.Id == submissionId);
+
+        if (submission == null)
+            throw new AppException($"Submission with ID {submissionId} not found", StatusCodes.Status404NotFound);
+
+        submission.Grade = dto.Grade;
+        submission.GradedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        return new SubmissionResponseDto
+        {
+            Id = submission.Id,
+            ProblemId = submission.ProblemId,
+            StudentId = submission.StudentId,
+            StudentName = submission.Student.User.FirstName + " " + submission.Student.User.LastName,
+            StudentEmail = submission.Student.User.Email,
+            SolutionText = submission.SubmittedSolutionText,
+            PhotoUrl = submission.SubmittedSolutionPhotoKey,
+            Grade = submission.Grade,
+            SubmittedAt = submission.SubmittedAt
+        };
+    }
+
+    public async Task<IEnumerable<SubmissionResponseDto>> GetMySubmissions()
+    {
+        var student = await _context.Students.FirstOrDefaultAsync(s => s.UserId == _currentUser.UserId);
+        if (student == null)
+            return new List<SubmissionResponseDto>();
+
+        return await _context.ProblemStudents
+            .Where(ps => ps.StudentId == student.Id)
+            .Include(ps => ps.Student).ThenInclude(s => s.User)
+            .Include(ps => ps.Problem)
+            .OrderByDescending(ps => ps.SubmittedAt)
+            .Select(ps => new SubmissionResponseDto
+            {
+                Id = ps.Id,
+                ProblemId = ps.ProblemId,
+                StudentId = ps.StudentId,
+                StudentName = ps.Student.User.FirstName + " " + ps.Student.User.LastName,
+                StudentEmail = ps.Student.User.Email,
+                SolutionText = ps.SubmittedSolutionText,
+                PhotoUrl = ps.SubmittedSolutionPhotoKey,
+                Grade = ps.Grade,
+                SubmittedAt = ps.SubmittedAt,
+                ProblemTitle = ps.Problem.Title,
+                ProblemTopic = ps.Problem.Topic,
+                ProblemStatement = ps.Problem.Statement,
+                ProblemDifficulty = ps.Problem.Difficulty
+            })
+            .ToListAsync();
+    }
 }

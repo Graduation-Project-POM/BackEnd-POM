@@ -13,7 +13,11 @@ public class ProblemStudent
     public Student Student { get; set; }
 
     public string? SubmittedSolutionText { get; set; }
-    public string? SubmittedSolutionPhotoKey { get; set; } 
+    public string? SubmittedSolutionPhotoKey { get; set; }
 
     public DateTime SubmittedAt { get; set; } = DateTime.UtcNow;
+
+    // Grade given by a trainer/admin (0-100). Null = not graded yet.
+    public int? Grade { get; set; }
+    public DateTime? GradedAt { get; set; }
 }
