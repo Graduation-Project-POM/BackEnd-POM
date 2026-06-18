@@ -60,7 +60,9 @@ public class ProblemService : IProblemServices
             Title = p.Title,
             Statement = p.Statement,
             Difficulty = p.Difficulty,
-            //PhotoUrl = string.IsNullOrEmpty(p.PhotoFileKey) ? null : _s3Service.GetPublicUrl(p.PhotoFileKey),
+            // Relative path (e.g. "/uploads/x.png"); the client resolves it
+            // against the API host. Null when the problem has no image.
+            PhotoUrl = string.IsNullOrEmpty(p.PhotoFileKey) ? null : p.PhotoFileKey,
             Topic = p.Topic,
             IsPublished = p.IsPublished,
             PublisherName = p.Trainer != null ? p.Trainer.User.FirstName + " " + p.Trainer.User.LastName : null,
@@ -115,7 +117,7 @@ public class ProblemService : IProblemServices
             IsPublished = p.IsPublished,
             PublisherName = p.Trainer != null ? p.Trainer.User.FirstName + " " + p.Trainer.User.LastName : null,
             CanModify = isAdmin || (myTrainerId != null && p.TrainerID == myTrainerId),
-            //PhotoUrl = string.IsNullOrEmpty(p.PhotoFileKey) ? null : _s3Service.GetPublicUrl(p.PhotoFileKey)
+            PhotoUrl = string.IsNullOrEmpty(p.PhotoFileKey) ? null : p.PhotoFileKey
         };
     }
 
@@ -307,7 +309,7 @@ public class ProblemService : IProblemServices
                 StudentEmail = ps.Student.User.Email,
                 SolutionText = ps.SubmittedSolutionText,
                 PhotoUrl = ps.SubmittedSolutionPhotoKey,
-                Grade = ps.Grade,
+                Grade = ps.Score,
                 Feedback = ps.Feedback,
                 GradedAt = ps.GradedAt,
                 SubmittedAt = ps.SubmittedAt
@@ -324,7 +326,7 @@ public class ProblemService : IProblemServices
         if (submission == null)
             throw new AppException($"Submission with ID {submissionId} not found", StatusCodes.Status404NotFound);
 
-        submission.Grade = dto.Grade;
+        submission.Score = dto.Grade;
         submission.Feedback = dto.Feedback;
         submission.GradedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
@@ -338,7 +340,7 @@ public class ProblemService : IProblemServices
             StudentEmail = submission.Student.User.Email,
             SolutionText = submission.SubmittedSolutionText,
             PhotoUrl = submission.SubmittedSolutionPhotoKey,
-            Grade = submission.Grade,
+            Grade = submission.Score,
             Feedback = submission.Feedback,
             GradedAt = submission.GradedAt,
             SubmittedAt = submission.SubmittedAt
@@ -365,7 +367,7 @@ public class ProblemService : IProblemServices
                 StudentEmail = ps.Student.User.Email,
                 SolutionText = ps.SubmittedSolutionText,
                 PhotoUrl = ps.SubmittedSolutionPhotoKey,
-                Grade = ps.Grade,
+                Grade = ps.Score,
                 Feedback = ps.Feedback,
                 GradedAt = ps.GradedAt,
                 SubmittedAt = ps.SubmittedAt,
