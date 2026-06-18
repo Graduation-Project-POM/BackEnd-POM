@@ -16,6 +16,7 @@ namespace MIO.Core.DTOs.UserDtos
         public string? PhoneNumber { get; set; }
         public required string Gender { get; set; }
         public string ProfileImageUrl { get; set; }
+        public string? Bio { get; set; }
         public bool IsActive { get; set; }
         public DateTime CreatedAt { get; set; }
         public DateTime LastUpdatedAt { get; set; }

@@ -42,6 +42,30 @@ namespace MIO.API.Controllers
 
 
         [HttpGet]
+        [Route("me")]
+        [Authorize(Roles = "Trainer")]
+        public async Task<ActionResult<TrainerResponseDTO>> GetMyProfile()
+        {
+            return Ok(await trainerService.GetMyTrainerService());
+        }
+
+        [HttpPut]
+        [Route("me")]
+        [Authorize(Roles = "Trainer")]
+        public async Task<ActionResult> UpdateMyProfile(UpdateTrainerDTO trainerDTO)
+        {
+            if (trainerDTO == null)
+                return new BadRequestObjectResult("trainer data cannot be null");
+
+            var updated = await trainerService.UpdateMyTrainerService(trainerDTO);
+            return new OkObjectResult(new
+            {
+                message = "Profile updated successfully",
+                trainerId = updated!.Id
+            });
+        }
+
+        [HttpGet]
         [Route("{id}")]
         // Profile viewing is open to any authenticated user (View Profile feature).
         [Authorize]

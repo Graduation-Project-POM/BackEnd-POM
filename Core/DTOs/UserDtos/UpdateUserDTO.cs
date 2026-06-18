@@ -25,7 +25,9 @@ namespace MIO.Core.DTOs.UserDtos
             public required string Gender { get; set; }
 
             public string ProfileImageUrl { get; set; }
-            
+
+            public string? Bio { get; set; }
+
             public DateTime LastUpdatedAt { get; set; }
     }
 }

@@ -132,6 +132,55 @@ namespace MIO.Infrastructure.Services
 
         }
 
+        private async Task<Trainer> GetOrCreateCurrentTrainer()
+        {
+            var userId = _currentUser.UserId;
+            var trainer = await _dbContext.Trainers
+                .Include(t => t.User)
+                .FirstOrDefaultAsync(t => t.UserId == userId);
+
+            if (trainer == null)
+            {
+                var user = await _dbContext.Users.FindAsync(userId);
+                if (user == null || user.RoleID != Role.Trainer)
+                    throw new AppException("Only trainers have a trainer profile", StatusCodes.Status403Forbidden);
+
+                trainer = new Trainer { UserId = userId, Specialization = "" };
+                _dbContext.Trainers.Add(trainer);
+                await _dbContext.SaveChangesAsync();
+                trainer.User = user;
+            }
+
+            return trainer;
+        }
+
+        public async Task<TrainerResponseDTO?> GetMyTrainerService()
+        {
+            var trainer = await GetOrCreateCurrentTrainer();
+            return new TrainerResponseDTO
+            {
+                Id = trainer.Id,
+                Specialization = trainer.Specialization,
+                BasicUser = new BasicUserDTO
+                {
+                    Id = trainer.UserId,
+                    FirstName = trainer.User.FirstName,
+                    LastName = trainer.User.LastName,
+                    Email = trainer.User.Email,
+                    UserName = trainer.User.UserName,
+                    PhoneNumber = trainer.User.PhoneNumber
+                }
+            };
+        }
+
+        public async Task<Trainer?> UpdateMyTrainerService(UpdateTrainerDTO trainerDTO)
+        {
+            var trainer = await GetOrCreateCurrentTrainer();
+            trainer.Specialization = trainerDTO.Specialization;
+            await _dbContext.SaveChangesAsync();
+            return trainer;
+        }
+
         public async Task<Trainer?> DeleteTrainerService(int id)
         {
 
