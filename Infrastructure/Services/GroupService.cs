@@ -14,7 +14,11 @@ public class GroupService(AppDbContext db) : IGroupService
     public async Task<IEnumerable<GroupResponseDto>> GetAllAsync()
     {
         return await db.Groups
-            .Select(g => new GroupResponseDto(g.Id, g.Name, g.Description, g.StartDate, g.TrainerId ?? 0, g.GroupStudents.Count))
+            .Select(g => new GroupResponseDto(
+                g.Id, g.Name, g.Description, g.StartDate, g.TrainerId ?? 0, g.GroupStudents.Count,
+                g.Trainer != null ? ((g.Trainer.User.FirstName + " " + g.Trainer.User.LastName).Trim()) : null,
+                g.Trainer != null ? g.Trainer.User.Email : null,
+                g.Trainer != null ? g.Trainer.Specialization : null))
             .ToListAsync();
     }
 
@@ -22,7 +26,11 @@ public class GroupService(AppDbContext db) : IGroupService
     {
         var group = await db.Groups
             .Where(g => g.Id == id)
-            .Select(g => new GroupResponseDto(g.Id, g.Name, g.Description, g.StartDate, g.TrainerId ?? 0, g.GroupStudents.Count))
+            .Select(g => new GroupResponseDto(
+                g.Id, g.Name, g.Description, g.StartDate, g.TrainerId ?? 0, g.GroupStudents.Count,
+                g.Trainer != null ? ((g.Trainer.User.FirstName + " " + g.Trainer.User.LastName).Trim()) : null,
+                g.Trainer != null ? g.Trainer.User.Email : null,
+                g.Trainer != null ? g.Trainer.Specialization : null))
             .FirstOrDefaultAsync();
 
         if (group is null)
@@ -54,7 +62,22 @@ public class GroupService(AppDbContext db) : IGroupService
         db.Groups.Add(group);
         await db.SaveChangesAsync();
 
-        return new GroupResponseDto(group.Id, group.Name, group.Description, group.StartDate, group.TrainerId ?? 0, 0);
+        // Resolve the assigned trainer's name/email for an immediately-consistent response.
+        var trainer = group.TrainerId is null
+            ? null
+            : await db.Trainers
+                .Where(tr => tr.Id == group.TrainerId)
+                .Select(tr => new
+                {
+                    Name = (tr.User.FirstName + " " + tr.User.LastName).Trim(),
+                    tr.User.Email,
+                    tr.Specialization,
+                })
+                .FirstOrDefaultAsync();
+
+        return new GroupResponseDto(
+            group.Id, group.Name, group.Description, group.StartDate, group.TrainerId ?? 0, 0,
+            trainer?.Name, trainer?.Email, trainer?.Specialization);
     }
 
     public async Task<bool> UpdateAsync(int id, UpdateGroupDto dto)

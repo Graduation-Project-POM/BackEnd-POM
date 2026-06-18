@@ -6,5 +6,8 @@ public record GroupResponseDto(
     string? Description,
     DateOnly StartDate,
     int TrainerId,
-    int StudentCount
+    int StudentCount,
+    string? TrainerName,
+    string? TrainerEmail,
+    string? TrainerSpecialization
 );
