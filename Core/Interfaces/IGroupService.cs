@@ -23,4 +23,7 @@ public interface IGroupService
 
     // Get all contests accessible to a student (via their groups)
     Task<IEnumerable<GroupContestDto>> GetContestsForStudentAsync(int studentId);
+
+    // Get the groups a student belongs to, resolved from their user id.
+    Task<IEnumerable<GroupResponseDto>> GetGroupsForStudentByUserIdAsync(int userId);
 }

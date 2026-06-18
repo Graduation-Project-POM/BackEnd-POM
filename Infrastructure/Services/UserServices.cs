@@ -50,7 +50,38 @@ namespace MIO.Infrastructure.Services
 
             _dbContext.Users.Add(user);
             await _dbContext.SaveChangesAsync();
+            await EnsureRoleProfile(user);
             return user;
+        }
+
+        // Ensure a user with the Student/Trainer role has the matching entity row,
+        // so they appear in GET /Student and GET /Trainer (and can join groups).
+        private async Task EnsureRoleProfile(User user)
+        {
+            if (user.RoleID == Role.Student &&
+                !await _dbContext.Students.AnyAsync(s => s.UserId == user.Id))
+            {
+                _dbContext.Students.Add(new Student
+                {
+                    UserId = user.Id,
+                    GradeLevel = "",
+                    City = "",
+                    SchoolName = "",
+                    NationalId = "",
+                    IsAccepted = true
+                });
+                await _dbContext.SaveChangesAsync();
+            }
+            else if (user.RoleID == Role.Trainer &&
+                !await _dbContext.Trainers.AnyAsync(t => t.UserId == user.Id))
+            {
+                _dbContext.Trainers.Add(new Trainer
+                {
+                    UserId = user.Id,
+                    Specialization = ""
+                });
+                await _dbContext.SaveChangesAsync();
+            }
         }
 
         public async Task<User?> RegisterStudent(CreateUserDTO userDTO)
@@ -80,6 +111,7 @@ namespace MIO.Infrastructure.Services
 
             _dbContext.Users.Add(user);
             await _dbContext.SaveChangesAsync();
+            await EnsureRoleProfile(user);
             return user;
         }
 

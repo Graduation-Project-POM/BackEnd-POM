@@ -6,5 +6,7 @@ public record GroupContestDto(
     [Required]
     int ContestId,
     string Title,
-    DateOnly AddDate
+    DateOnly AddDate,
+    DateTime StartAt,
+    DateTime EndAt
 );

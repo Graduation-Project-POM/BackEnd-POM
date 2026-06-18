@@ -9,12 +9,28 @@ using MIO2.Core.Interfaces;
 
 namespace MIO.Infrastructure.Services;
 
-public class GroupService(AppDbContext db) : IGroupService
+public class GroupService(AppDbContext db, ICurrentUserService currentUser) : IGroupService
 {
     public async Task<IEnumerable<GroupResponseDto>> GetAllAsync()
     {
-        return await db.Groups
-            .Select(g => new GroupResponseDto(g.Id, g.Name, g.Description, g.StartDate, g.TrainerId))
+        var isAdmin = currentUser.Role == "Admin";
+
+        var trainerId = await db.Trainers
+            .Where(t => t.UserId == currentUser.UserId)
+            .Select(t => (int?)t.Id)
+            .FirstOrDefaultAsync();
+
+        var query = db.Groups.AsQueryable();
+
+        if (!isAdmin)
+            query = query.Where(g => g.TrainerId == trainerId);
+
+        return await query
+            .Select(g => new GroupResponseDto(
+                g.Id, g.Name, g.Description, g.StartDate, g.TrainerId ?? 0, g.GroupStudents.Count,
+                g.Trainer != null ? ((g.Trainer.User.FirstName + " " + g.Trainer.User.LastName).Trim()) : null,
+                g.Trainer != null ? g.Trainer.User.Email : null,
+                g.Trainer != null ? g.Trainer.Specialization : null))
             .ToListAsync();
     }
 
@@ -22,32 +38,62 @@ public class GroupService(AppDbContext db) : IGroupService
     {
         var group = await db.Groups
             .Where(g => g.Id == id)
-            .Select(g => new GroupResponseDto(g.Id, g.Name, g.Description, g.StartDate, g.TrainerId))
+            .Select(g => new GroupResponseDto(
+                g.Id, g.Name, g.Description, g.StartDate, g.TrainerId ?? 0, g.GroupStudents.Count,
+                g.Trainer != null ? ((g.Trainer.User.FirstName + " " + g.Trainer.User.LastName).Trim()) : null,
+                g.Trainer != null ? g.Trainer.User.Email : null,
+                g.Trainer != null ? g.Trainer.Specialization : null))
             .FirstOrDefaultAsync();
 
         if (group is null)
             throw new AppException($"Group with ID {id} not found", StatusCodes.Status404NotFound);
 
+        await EnsureCanViewGroupAsync(id);
         return group;
     }
 
     public async Task<GroupResponseDto> CreateAsync(CreateGroupDto dto)
     {
-        bool trainerExists = await db.Trainers.AnyAsync(t => t.Id == dto.TrainerId);
-        if (!trainerExists)
-            throw new AppException($"Trainer with ID {dto.TrainerId} not found", StatusCodes.Status404NotFound);
+        int? trainerId = null;
+        if (currentUser.Role == "Trainer")
+        {
+            trainerId = await CurrentTrainerIdAsync();
+            if (trainerId == null)
+                throw new AppException("You must be a Trainer to create a group", StatusCodes.Status403Forbidden);
+        }
+        else if (dto.TrainerId > 0)
+        {
+            bool trainerExists = await db.Trainers.AnyAsync(t => t.Id == dto.TrainerId);
+            if (!trainerExists)
+                throw new AppException($"Trainer with ID {dto.TrainerId} not found", StatusCodes.Status404NotFound);
+            trainerId = dto.TrainerId;
+        }
 
         var group = new Group
         {
             Name = dto.Name,
             Description = dto.Description,
-            TrainerId = dto.TrainerId
+            TrainerId = trainerId
         };
 
         db.Groups.Add(group);
         await db.SaveChangesAsync();
 
-        return new GroupResponseDto(group.Id, group.Name, group.Description, group.StartDate, group.TrainerId);
+        var trainer = group.TrainerId is null
+            ? null
+            : await db.Trainers
+                .Where(tr => tr.Id == group.TrainerId)
+                .Select(tr => new
+                {
+                    Name = (tr.User.FirstName + " " + tr.User.LastName).Trim(),
+                    tr.User.Email,
+                    tr.Specialization,
+                })
+                .FirstOrDefaultAsync();
+
+        return new GroupResponseDto(
+            group.Id, group.Name, group.Description, group.StartDate, group.TrainerId ?? 0, 0,
+            trainer?.Name, trainer?.Email, trainer?.Specialization);
     }
 
     public async Task<bool> UpdateAsync(int id, UpdateGroupDto dto)
@@ -55,6 +101,8 @@ public class GroupService(AppDbContext db) : IGroupService
         var group = await db.Groups.FindAsync(id);
         if (group is null)
             throw new AppException($"Group with ID {id} not found", StatusCodes.Status404NotFound);
+
+        await EnsureCanManageGroupAsync(id);
 
         group.Name = dto.Name;
         group.Description = dto.Description;
@@ -69,6 +117,8 @@ public class GroupService(AppDbContext db) : IGroupService
         if (group is null)
             throw new AppException($"Group with ID {id} not found", StatusCodes.Status404NotFound);
 
+        await EnsureCanManageGroupAsync(id);
+
         db.Groups.Remove(group);
         await db.SaveChangesAsync();
         return true;
@@ -81,6 +131,8 @@ public class GroupService(AppDbContext db) : IGroupService
         bool groupExists = await db.Groups.AnyAsync(g => g.Id == groupId);
         if (!groupExists)
             throw new AppException($"Group with ID {groupId} not found", StatusCodes.Status404NotFound);
+
+        await EnsureCanViewGroupAsync(groupId);
 
         return await db.GroupStudents
             .Where(gs => gs.GroupId == groupId)
@@ -97,6 +149,8 @@ public class GroupService(AppDbContext db) : IGroupService
         bool groupExists = await db.Groups.AnyAsync(g => g.Id == groupId);
         if (!groupExists)
             throw new AppException($"Group with ID {groupId} not found", StatusCodes.Status404NotFound);
+
+        await EnsureCanManageGroupAsync(groupId);
 
         var existingStudentIds = await db.GroupStudents
             .Where(gs => gs.GroupId == groupId)
@@ -137,6 +191,8 @@ public class GroupService(AppDbContext db) : IGroupService
 
     public async Task<bool> RemoveStudentAsync(int groupId, int studentId)
     {
+        await EnsureCanManageGroupAsync(groupId);
+
         var entry = await db.GroupStudents
             .FirstOrDefaultAsync(gs => gs.GroupId == groupId && gs.StudentId == studentId);
 
@@ -156,12 +212,16 @@ public class GroupService(AppDbContext db) : IGroupService
         if (!groupExists)
             throw new AppException($"Group with ID {groupId} not found", StatusCodes.Status404NotFound);
 
+        await EnsureCanViewGroupAsync(groupId);
+
         return await db.GroupContests
             .Where(gc => gc.GroupId == groupId)
             .Select(gc => new GroupContestDto(
                 gc.ContestId,
                 gc.Contest.Title,
-                gc.AddDate
+                gc.AddDate,
+                gc.Contest.StartAt,
+                gc.Contest.EndAt
             ))
             .ToListAsync();
     }
@@ -172,6 +232,8 @@ public class GroupService(AppDbContext db) : IGroupService
         if (!groupExists)
             throw new AppException($"Group with ID {groupId} not found", StatusCodes.Status404NotFound);
 
+        await EnsureCanManageGroupAsync(groupId);
+
         bool contestExists = await db.Contests.AnyAsync(c => c.Id == contestId);
         if (!contestExists)
             throw new AppException($"Contest with ID {contestId} not found", StatusCodes.Status404NotFound);
@@ -181,6 +243,11 @@ public class GroupService(AppDbContext db) : IGroupService
         if (alreadyIn)
             throw new AppException($"Contest {contestId} is already in group {groupId}", StatusCodes.Status409Conflict);
 
+        bool inAnotherGroup = await db.GroupContests
+            .AnyAsync(gc => gc.ContestId == contestId && gc.GroupId != groupId);
+        if (inAnotherGroup)
+            throw new AppException($"Contest {contestId} already belongs to another group", StatusCodes.Status409Conflict);
+
         db.GroupContests.Add(new GroupContest { GroupId = groupId, ContestId = contestId });
         await db.SaveChangesAsync();
         return true;
@@ -188,6 +255,8 @@ public class GroupService(AppDbContext db) : IGroupService
 
     public async Task<bool> RemoveContestAsync(int groupId, int contestId)
     {
+        await EnsureCanManageGroupAsync(groupId);
+
         var entry = await db.GroupContests
             .FirstOrDefaultAsync(gc => gc.GroupId == groupId && gc.ContestId == contestId);
 
@@ -211,9 +280,76 @@ public class GroupService(AppDbContext db) : IGroupService
             .Select(gc => new GroupContestDto(
                 gc.ContestId,
                 gc.Contest.Title,
-                gc.AddDate
+                gc.AddDate,
+                gc.Contest.StartAt,
+                gc.Contest.EndAt
             ))
             .Distinct()
             .ToListAsync();
+    }
+
+    public async Task<IEnumerable<GroupResponseDto>> GetGroupsForStudentByUserIdAsync(int userId)
+    {
+        var studentId = await db.Students
+            .Where(s => s.UserId == userId)
+            .Select(s => (int?)s.Id)
+            .FirstOrDefaultAsync();
+
+        // A user with no student profile simply belongs to no groups.
+        if (studentId is null)
+            return [];
+
+        return await db.GroupStudents
+            .Where(gs => gs.StudentId == studentId)
+            .Select(gs => gs.Group)
+            .Select(g => new GroupResponseDto(
+                g.Id, g.Name, g.Description, g.StartDate, g.TrainerId ?? 0, g.GroupStudents.Count,
+                g.Trainer != null ? ((g.Trainer.User.FirstName + " " + g.Trainer.User.LastName).Trim()) : null,
+                g.Trainer != null ? g.Trainer.User.Email : null,
+                g.Trainer != null ? g.Trainer.Specialization : null))
+            .ToListAsync();
+    }
+
+    private Task<int?> CurrentTrainerIdAsync() =>
+        db.Trainers
+            .Where(t => t.UserId == currentUser.UserId)
+            .Select(t => (int?)t.Id)
+            .FirstOrDefaultAsync();
+
+    private async Task EnsureCanManageGroupAsync(int groupId)
+    {
+        if (currentUser.Role == "Admin") return;
+
+        var groupTrainerId = await db.Groups
+            .Where(g => g.Id == groupId)
+            .Select(g => g.TrainerId)
+            .FirstOrDefaultAsync();
+
+        var myTrainerId = await CurrentTrainerIdAsync();
+
+        if (myTrainerId == null || groupTrainerId == null || groupTrainerId != myTrainerId)
+            throw new AppException("You are not authorized to manage this group", StatusCodes.Status403Forbidden);
+    }
+
+    private async Task EnsureCanViewGroupAsync(int groupId)
+    {
+        if (currentUser.Role == "Admin") return;
+
+        if (currentUser.Role == "Trainer")
+        {
+            var groupTrainerId = await db.Groups
+                .Where(g => g.Id == groupId)
+                .Select(g => g.TrainerId)
+                .FirstOrDefaultAsync();
+            var myTrainerId = await CurrentTrainerIdAsync();
+
+            if (myTrainerId != null && groupTrainerId == myTrainerId) return;
+            throw new AppException("You are not authorized to view this group", StatusCodes.Status403Forbidden);
+        }
+
+        var isMember = await db.GroupStudents
+            .AnyAsync(gs => gs.GroupId == groupId && gs.Student.UserId == currentUser.UserId);
+        if (!isMember)
+            throw new AppException("You are not authorized to view this group", StatusCodes.Status403Forbidden);
     }
 }

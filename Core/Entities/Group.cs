@@ -9,8 +9,8 @@ public class Group
     public string? Description { get; set; }
     public DateOnly StartDate { get; set; } = DateOnly.FromDateTime(DateTime.Now);
 
-    public int TrainerId { get; set; }
-    public Trainer Trainer { get; set; }
+    public int? TrainerId { get; set; }
+    public Trainer? Trainer { get; set; }
 
     public ICollection<GroupStudent> GroupStudents { get; set; } = [];
     public ICollection<GroupContest> GroupContests { get; set; } = [];

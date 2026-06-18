@@ -1,20 +1,52 @@
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using MIO.Core.DTOs.ProblemDTOs;
 using MIO2.Core.Interfaces;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize] 
+[Authorize]
 public class ProblemsController : ControllerBase
 {
     private readonly IProblemServices _Problemservice;
-    //private readonly IS3Service _s3Service;
+    private readonly IWebHostEnvironment _env;
 
-    public ProblemsController(IProblemServices problemservice)
+    public ProblemsController(IProblemServices problemservice, IWebHostEnvironment env)
     {
         _Problemservice = problemservice;
-       
+        _env = env;
+    }
+
+
+    [HttpPost("upload-image")]
+    [Authorize(Roles = "Admin,Trainer,Student")]
+    public async Task<ActionResult> UploadImage([FromForm] IFormFile file)
+    {
+        if (file is null || file.Length == 0)
+            return BadRequest(new { message = "No file uploaded." });
+
+        const long maxBytes = 5 * 1024 * 1024; // 5 MB
+        if (file.Length > maxBytes)
+            return BadRequest(new { message = "Image must be 5 MB or smaller." });
+
+        var allowed = new[] { ".png", ".jpg", ".jpeg", ".gif", ".webp" };
+        var ext = Path.GetExtension(file.FileName).ToLowerInvariant();
+        if (!allowed.Contains(ext))
+            return BadRequest(new { message = "Unsupported image type. Use PNG, JPG, GIF or WEBP." });
+
+      
+        var uploadsDir = Path.Combine(_env.ContentRootPath, "wwwroot", "uploads");
+        Directory.CreateDirectory(uploadsDir);
+
+        var fileName = $"{Guid.NewGuid():N}{ext}";
+        var fullPath = Path.Combine(uploadsDir, fileName);
+        await using (var stream = System.IO.File.Create(fullPath))
+        {
+            await file.CopyToAsync(stream);
+        }
+
+        return Ok(new { url = $"/uploads/{fileName}" });
     }
     // public ProblemsController(IProblemServices problemservice,IS3Service s3Service)
     // {

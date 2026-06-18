@@ -55,7 +55,7 @@ namespace MIO.Migrations
                     b.Property<DateOnly>("StartDate")
                         .HasColumnType("date");
 
-                    b.Property<int>("TrainerId")
+                    b.Property<int?>("TrainerId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
@@ -393,6 +393,9 @@ namespace MIO.Migrations
                     b.Property<int>("ProblemId")
                         .HasColumnType("int");
 
+                    b.Property<int?>("Score")
+                        .HasColumnType("int");
+
                     b.Property<int>("StudentId")
                         .HasColumnType("int");
 
@@ -482,9 +485,7 @@ namespace MIO.Migrations
                 {
                     b.HasOne("MIO.Core.Entities.Trainer", "Trainer")
                         .WithMany()
-                        .HasForeignKey("TrainerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("TrainerId");
 
                     b.Navigation("Trainer");
                 });

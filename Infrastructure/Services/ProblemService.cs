@@ -178,14 +178,10 @@ public class ProblemService : IProblemServices
                 StatusCodes.Status404NotFound);
         }
 
-        if (!string.IsNullOrEmpty(dto.PhotoFileKey) && dto.PhotoFileKey != problem.PhotoFileKey)
-        {
-            // if (!string.IsNullOrEmpty(problem.PhotoFileKey))
-            //     await _s3Service.DeleteMediaAsync(problem.PhotoFileKey);
+        problem.PhotoFileKey = string.IsNullOrWhiteSpace(dto.PhotoFileKey)
+            ? null
+            : dto.PhotoFileKey;
 
-            problem.PhotoFileKey = dto.PhotoFileKey;
-        }
-        
         problem.Title = dto.Title;
         problem.Statement = dto.Statement ?? problem.Statement;
         problem.Difficulty = dto.Difficulty;
