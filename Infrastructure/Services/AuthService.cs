@@ -39,7 +39,11 @@ public class AuthService :IAuthService
         user.RefreshTokenRevokedAt = null;
         _dbContext.SaveChanges();
 
-        
+        var trainerId = _dbContext.Trainers
+            .Where(t => t.UserId == user.Id)
+            .Select(t => (int?)t.Id)
+            .FirstOrDefault();
+
         return new AuthResponseDTO
         {
             AccessToken = accessToken,
@@ -47,7 +51,8 @@ public class AuthService :IAuthService
             ExpiresAt = expires,
             UserId = user.Id,
             UserName = user.UserName,
-            Role = user.RoleID.ToString()
+            Role = user.RoleID.ToString(),
+            TrainerId = trainerId
         };
     }
     

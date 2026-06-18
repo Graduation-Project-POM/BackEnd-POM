@@ -5,6 +5,7 @@ using MIO.Core.DTOs.ProblemDTOs;
 using MIO.Core.Entities;
 using MIO.Core.Interfaces;
 using MIO.Infrastructure;
+using MIO2.Core.Entities;
 using MIO2.Core.Interfaces;
 
 public class ProblemService : IProblemServices
@@ -73,7 +74,6 @@ public class ProblemService : IProblemServices
        var isAdmin = _currentUser.Role == "Admin";
        var trainer=await _context.Trainers.FirstOrDefaultAsync(t => t.UserId == userID);
 
-        // Trainers own the problems they create; admins may also create (no owner).
         if (trainer==null && !isAdmin)
         {
             throw new AppException(
@@ -118,8 +118,6 @@ public class ProblemService : IProblemServices
                 StatusCodes.Status404NotFound);
         }
 
-        // The edit form always sends the current image value, so apply it
-        // directly: a new value updates it, an empty value clears it.
         problem.PhotoFileKey = string.IsNullOrWhiteSpace(dto.PhotoFileKey)
             ? null
             : dto.PhotoFileKey;
@@ -148,8 +146,6 @@ public class ProblemService : IProblemServices
                 StatusCodes.Status404NotFound);
         }
 
-        // if (!string.IsNullOrEmpty(problem.PhotoFileKey))
-        //     await _s3Service.DeleteMediaAsync(problem.PhotoFileKey);
         
         _context.Problems.Remove(problem);
         await _context.SaveChangesAsync();
@@ -166,7 +162,22 @@ public class ProblemService : IProblemServices
     if (problem == null)
         throw new AppException($"Problem with ID {problemId} not found", StatusCodes.Status404NotFound);
 
-   
+    var now = DateTime.UtcNow;
+    var windows = await _context.Contests
+        .Where(c => c.Problems.Any(p => p.ID == problemId))
+        .Select(c => new { c.StartAt, c.EndAt })
+        .ToListAsync();
+
+    if (windows.Count > 0 && !windows.Any(w => now >= w.StartAt && now <= w.EndAt))
+    {
+        bool notStarted = windows.All(w => now < w.StartAt);
+        throw new AppException(
+            notStarted
+                ? "This contest hasn't started yet."
+                : "This contest has ended; submissions are closed.",
+            StatusCodes.Status403Forbidden);
+    }
+
     var userId = _currentUser.UserId;
     var student = await _context.Students.FirstOrDefaultAsync(s => s.UserId == userId);
     if (student == null)
@@ -176,42 +187,100 @@ public class ProblemService : IProblemServices
     if (string.IsNullOrWhiteSpace(dto.SolutionText) && string.IsNullOrWhiteSpace(dto.PhotoFileKey))
         throw new AppException("You must provide a solution text or a photo", StatusCodes.Status400BadRequest);
 
-    
-    if (!string.IsNullOrWhiteSpace(dto.PhotoFileKey))
+    var submission = await _context.ProblemStudents
+        .FirstOrDefaultAsync(ps => ps.ProblemId == problemId && ps.StudentId == student.Id);
+
+    if (submission == null)
     {
-        // bool exists = await _s3Service.IsMediaExists(dto.PhotoFileKey);
-        // if (!exists)
-        //     throw new AppException("Photo file not found in storage", StatusCodes.Status404NotFound);
+        submission = new ProblemStudent
+        {
+            ProblemId = problemId,
+            StudentId = student.Id,
+            SubmittedSolutionText = dto.SolutionText,
+            SubmittedSolutionPhotoKey = dto.PhotoFileKey,
+            SubmittedAt = now,
+        };
+        _context.ProblemStudents.Add(submission);
+    }
+    else
+    {
+        submission.SubmittedSolutionText = dto.SolutionText;
+        submission.SubmittedSolutionPhotoKey = dto.PhotoFileKey;
+        submission.SubmittedAt = now;
     }
 
-    // check if already submitted
-    bool alreadySubmitted = await _context.ProblemStudents
-        .AnyAsync(ps => ps.ProblemId == problemId && ps.StudentId == student.Id);
-    if (alreadySubmitted)
-        throw new AppException("You have already submitted a solution for this problem", StatusCodes.Status409Conflict);
-
-    // var submission = new ProblemStudent
-    // {
-    //     ProblemId = problemId,
-    //     StudentId = student.Id,
-    //     SubmittedSolutionText = dto.SolutionText,
-    //     SubmittedSolutionPhotoKey = dto.PhotoFileKey
-    // };
-    
-    
-   // _context.ProblemStudents.Add(submission);
     await _context.SaveChangesAsync();
 
     return new SubmitSolutionResponseDto
     {
-        // SubmissionId = submission.Id,
-        // ProblemId = submission.ProblemId,
-        // StudentId = submission.StudentId,
-        // SolutionText = submission.SubmittedSolutionText,
-        // PhotoUrl = string.IsNullOrEmpty(submission.SubmittedSolutionPhotoKey)
-        //     ? null
-        //     : _s3Service.GetPublicUrl(submission.SubmittedSolutionPhotoKey),
-        // SubmittedAt = submission.SubmittedAt
+        SubmissionId = submission.Id,
+        ProblemId = submission.ProblemId,
+        StudentId = submission.StudentId,
+        SolutionText = submission.SubmittedSolutionText,
+        PhotoUrl = submission.SubmittedSolutionPhotoKey,
+        SubmittedAt = submission.SubmittedAt,
     };
 }
+
+    public async Task<IEnumerable<SubmissionDto>> GetSubmissionsForProblem(int problemId)
+    {
+        bool exists = await _context.Problems.AnyAsync(p => p.ID == problemId);
+        if (!exists)
+            throw new AppException($"Problem with ID {problemId} not found", StatusCodes.Status404NotFound);
+
+        return await _context.ProblemStudents
+            .Where(ps => ps.ProblemId == problemId)
+            .Select(ps => new SubmissionDto
+            {
+                Id = ps.Id,
+                ProblemId = ps.ProblemId,
+                StudentId = ps.StudentId,
+                StudentName = ps.Student.User.UserName,
+                SolutionText = ps.SubmittedSolutionText,
+                SolutionPhotoUrl = ps.SubmittedSolutionPhotoKey,
+                SubmittedAt = ps.SubmittedAt,
+                Score = ps.Score,
+                Feedback = ps.Feedback,
+                GradedAt = ps.GradedAt,
+            })
+            .ToListAsync();
+    }
+
+    public async Task<SubmissionDto> GradeSubmission(int submissionId, GradeSubmissionDto dto)
+    {
+        var isAdmin = _currentUser.Role == "Admin";
+        var trainerId = await _context.Trainers
+            .Where(t => t.UserId == _currentUser.UserId)
+            .Select(t => (int?)t.Id)
+            .FirstOrDefaultAsync();
+
+        if (trainerId == null && !isAdmin)
+            throw new AppException("Only an instructor can grade submissions", StatusCodes.Status403Forbidden);
+
+        var submission = await _context.ProblemStudents
+            .Include(ps => ps.Student).ThenInclude(s => s.User)
+            .FirstOrDefaultAsync(ps => ps.Id == submissionId);
+
+        if (submission == null)
+            throw new AppException($"Submission with ID {submissionId} not found", StatusCodes.Status404NotFound);
+
+        submission.Score = dto.Score;
+        submission.Feedback = dto.Feedback;
+        submission.GradedAt = DateTime.UtcNow;
+        await _context.SaveChangesAsync();
+
+        return new SubmissionDto
+        {
+            Id = submission.Id,
+            ProblemId = submission.ProblemId,
+            StudentId = submission.StudentId,
+            StudentName = submission.Student.User.UserName,
+            SolutionText = submission.SubmittedSolutionText,
+            SolutionPhotoUrl = submission.SubmittedSolutionPhotoKey,
+            SubmittedAt = submission.SubmittedAt,
+            Score = submission.Score,
+            Feedback = submission.Feedback,
+            GradedAt = submission.GradedAt,
+        };
+    }
 }

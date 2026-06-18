@@ -13,10 +13,12 @@ namespace MIO.API.Controllers;
 public class GroupController : ControllerBase
 {
     private readonly IGroupService _groupService;
+    private readonly ICurrentUserService _currentUser;
 
-    public GroupController(IGroupService groupService)
+    public GroupController(IGroupService groupService, ICurrentUserService currentUser)
     {
         _groupService = groupService;
+        _currentUser = currentUser;
     }
 
     // GET /group
@@ -28,8 +30,17 @@ public class GroupController : ControllerBase
         return Ok(groups);
     }
 
+    // GET /group/my — groups the logged-in student is a member of.
+    [HttpGet("my")]
+    [Authorize(Roles = "Student")]
+    public async Task<ActionResult<IEnumerable<GroupResponseDto>>> GetMyGroups()
+    {
+        var groups = await _groupService.GetGroupsForStudentByUserIdAsync(_currentUser.UserId);
+        return Ok(groups);
+    }
+
     // GET /group/5
-    [HttpGet("{id}")]
+    [HttpGet("{id:int}")]
     [Authorize(Roles = "Admin,Trainer")]
     public async Task<ActionResult<GroupResponseDto>> GetById(int id)
     {
@@ -70,9 +81,9 @@ public class GroupController : ControllerBase
 
     // ── Students ──────────────────────────────────────────────
 
-    // GET /group/5/students
+    // GET /group/5/students — members of the group may view its roster.
     [HttpGet("{id}/students")]
-    [Authorize(Roles = "Admin,Trainer")]
+    [Authorize(Policy = "GroupMemberOrAdminOrTrainer")]
     public async Task<ActionResult<IEnumerable<GroupStudentDto>>> GetStudents(int id)
     {
         var students = await _groupService.GetStudentsAsync(id);

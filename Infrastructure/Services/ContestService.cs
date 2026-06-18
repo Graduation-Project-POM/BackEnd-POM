@@ -112,9 +112,22 @@ public class ContestService:IContestService
     
     public async Task<List<ContestDTO>> GetContests()
     {
-        return await _dbContext.Contests
-            .Include(c => c.Problems)
-            .Include(c => c.ContestStudents)
+        var isAdmin = _currentUser.Role == "Admin";
+
+        var trainerId = await _dbContext.Trainers
+            .Where(t => t.UserId == _currentUser.UserId)
+            .Select(t => (int?)t.Id)
+            .FirstOrDefaultAsync();
+
+        var query = _dbContext.Contests.AsQueryable();
+
+        // A trainer sees only contests that belong to a group they own
+        // (linked via GroupContest → Group.TrainerId). Admins see all contests.
+        if (!isAdmin)
+            query = query.Where(c => _dbContext.GroupContests
+                .Any(gc => gc.ContestId == c.Id && gc.Group.TrainerId == trainerId));
+
+        return await query
             .Select(c => new ContestDTO
             {
                 Id = c.Id,
@@ -206,6 +219,62 @@ public class ContestService:IContestService
     }
 
 
+    public async Task<List<StudentContestProblemDto>> GetContestProblemsForStudent(int contestId)
+    {
+        var studentId = await _dbContext.Students
+            .Where(s => s.UserId == _currentUser.UserId)
+            .Select(s => (int?)s.Id)
+            .FirstOrDefaultAsync();
+
+        if (studentId == null)
+            throw new AppException("Student not found for current user", StatusCodes.Status404NotFound);
+
+        var contestExists = await _dbContext.Contests.AnyAsync(c => c.Id == contestId);
+        if (!contestExists)
+            throw new AppException($"Contest with ID {contestId} not found", StatusCodes.Status404NotFound);
+
+        // The student may only access a contest that belongs to one of their groups.
+        var hasAccess = await _dbContext.GroupContests
+            .AnyAsync(gc => gc.ContestId == contestId &&
+                            gc.Group.GroupStudents.Any(gs => gs.StudentId == studentId));
+        if (!hasAccess)
+            throw new AppException("You are not enrolled in a group for this contest", StatusCodes.Status403Forbidden);
+
+        var problems = await _dbContext.Contests
+            .Where(c => c.Id == contestId)
+            .SelectMany(c => c.Problems)
+            .Select(p => new { p.ID, p.Title, p.Statement, p.Difficulty, p.Topic, p.PhotoFileKey })
+            .ToListAsync();
+
+        var problemIds = problems.Select(p => p.ID).ToList();
+        var subs = await _dbContext.ProblemStudents
+            .Where(ps => ps.StudentId == studentId && problemIds.Contains(ps.ProblemId))
+            .ToListAsync();
+        var subByProblem = subs.ToDictionary(s => s.ProblemId);
+
+        return problems.Select(p =>
+        {
+            subByProblem.TryGetValue(p.ID, out var s);
+            return new StudentContestProblemDto
+            {
+                ProblemId = p.ID,
+                Title = p.Title,
+                Statement = p.Statement,
+                Difficulty = p.Difficulty,
+                Topic = p.Topic,
+                PhotoUrl = string.IsNullOrEmpty(p.PhotoFileKey) ? null : p.PhotoFileKey,
+                Submitted = s != null,
+                SubmissionId = s?.Id,
+                SolutionText = s?.SubmittedSolutionText,
+                SolutionPhotoUrl = s?.SubmittedSolutionPhotoKey,
+                SubmittedAt = s?.SubmittedAt,
+                Score = s?.Score,
+                Feedback = s?.Feedback,
+                GradedAt = s?.GradedAt,
+            };
+        }).ToList();
+    }
+
     public async Task<ContestDTO> UpdateContest(int contestId, UpdateContestDTO dto)
     {
         var isAdmin = _currentUser.Role == "Admin";
@@ -225,10 +294,10 @@ public class ContestService:IContestService
         if (contest == null)
             throw new AppException($"Contest with ID {contestId} not found", StatusCodes.Status404NotFound);
 
-        if (!isAdmin && contest.TrainerId != trainerId)
+
+        if (!isAdmin && !await CanTrainerManageContestAsync(contestId, contest.TrainerId, trainerId))
             throw new AppException("You are not authorized to update this contest", StatusCodes.Status403Forbidden);
 
-        // Update scalar fields only if provided (partial update)
         if (!string.IsNullOrWhiteSpace(dto.Title))
             contest.Title = dto.Title;
 
@@ -244,9 +313,6 @@ public class ContestService:IContestService
         if (dto.EndAt.HasValue)
             contest.EndAt = dto.EndAt.Value;
 
-        // Replace the problem set whenever the caller supplies the list.
-        // A null list means "leave problems unchanged" (partial update); an
-        // empty list explicitly clears all problems (e.g. removing the last one).
         if (dto.ProblemIds != null)
         {
             var problems = await _dbContext.Problems
@@ -291,11 +357,20 @@ public class ContestService:IContestService
         if (contest == null)
             throw new AppException($"Contest with ID {contestId} not found", StatusCodes.Status404NotFound);
 
-        if (!isAdmin && contest.TrainerId != trainerId)
+        if (!isAdmin && !await CanTrainerManageContestAsync(contestId, contest.TrainerId, trainerId))
             throw new AppException("You are not authorized to delete this contest", StatusCodes.Status403Forbidden);
 
         _dbContext.Contests.Remove(contest);
         await _dbContext.SaveChangesAsync();
     }
-    
+
+    private async Task<bool> CanTrainerManageContestAsync(int contestId, int? contestTrainerId, int? myTrainerId)
+    {
+        if (myTrainerId == null) return false;
+        if (contestTrainerId == myTrainerId) return true;
+
+        return await _dbContext.GroupContests
+            .AnyAsync(gc => gc.ContestId == contestId && gc.Group.TrainerId == myTrainerId);
+    }
+
 }

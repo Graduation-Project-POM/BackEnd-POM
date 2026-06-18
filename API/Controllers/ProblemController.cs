@@ -20,7 +20,7 @@ public class ProblemsController : ControllerBase
 
 
     [HttpPost("upload-image")]
-    [Authorize(Roles = "Admin,Trainer")]
+    [Authorize(Roles = "Admin,Trainer,Student")]
     public async Task<ActionResult> UploadImage([FromForm] IFormFile file)
     {
         if (file is null || file.Length == 0)
@@ -130,5 +130,22 @@ public class ProblemsController : ControllerBase
         var result = await _Problemservice.SubmitSolution(id, dto);
         return Ok(result);
     }
-    
+
+    // GET /api/Problems/5/submissions — students' submissions to a problem (for grading).
+    [HttpGet("{id}/submissions")]
+    [Authorize(Roles = "Admin,Trainer")]
+    public async Task<ActionResult<IEnumerable<SubmissionDto>>> GetSubmissions(int id)
+    {
+        var submissions = await _Problemservice.GetSubmissionsForProblem(id);
+        return Ok(submissions);
+    }
+
+    // POST /api/Problems/submissions/12/grade — instructor records a mark + feedback.
+    [HttpPost("submissions/{submissionId}/grade")]
+    [Authorize(Roles = "Admin,Trainer")]
+    public async Task<ActionResult<SubmissionDto>> GradeSubmission(int submissionId, GradeSubmissionDto dto)
+    {
+        var result = await _Problemservice.GradeSubmission(submissionId, dto);
+        return Ok(result);
+    }
 }

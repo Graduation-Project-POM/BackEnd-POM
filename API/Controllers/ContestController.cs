@@ -42,7 +42,7 @@ public ContestController(IContestService contestService)
     }
     
     [HttpGet]
-    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Admin,Trainer")]
     public async Task<ActionResult<List<ContestDTO>>> GetContests()
     {
         var contests = await _contestService.GetContests();
@@ -70,6 +70,15 @@ public ContestController(IContestService contestService)
     public async Task<ActionResult<List<ProblemResponseDTO>>> GetContestProblems(int contestId)
     {
         var problems = await _contestService.GetContestProblems(contestId);
+        return Ok(problems);
+    }
+
+
+    [HttpGet("{contestId}/my-problems")]
+    [Authorize(Roles = "Student")]
+    public async Task<ActionResult<List<StudentContestProblemDto>>> GetMyContestProblems(int contestId)
+    {
+        var problems = await _contestService.GetContestProblemsForStudent(contestId);
         return Ok(problems);
     }
     

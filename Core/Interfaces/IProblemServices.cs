@@ -10,4 +10,8 @@ public interface IProblemServices
     Task<bool> Update(int id, UpdateProblemDto dto);
     Task<bool> Delete(int id);
     Task<SubmitSolutionResponseDto> SubmitSolution(int problemId, SubmitSolutionDto dto);
+
+    // Grading
+    Task<IEnumerable<SubmissionDto>> GetSubmissionsForProblem(int problemId);
+    Task<SubmissionDto> GradeSubmission(int submissionId, GradeSubmissionDto dto);
 }
