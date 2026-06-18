@@ -11,22 +11,18 @@ namespace MIO.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.AddColumn<string>(
-                name: "Feedback",
-                table: "ProblemStudents",
-                type: "nvarchar(max)",
-                nullable: true);
-
-            migrationBuilder.AddColumn<DateTime>(
-                name: "GradedAt",
-                table: "ProblemStudents",
-                type: "datetime2",
-                nullable: true);
-
+            // Note: GradedAt already exists (added by AddSubmissionGrade), so only
+            // Score and Feedback are added here.
             migrationBuilder.AddColumn<int>(
                 name: "Score",
                 table: "ProblemStudents",
                 type: "int",
+                nullable: true);
+
+            migrationBuilder.AddColumn<string>(
+                name: "Feedback",
+                table: "ProblemStudents",
+                type: "nvarchar(max)",
                 nullable: true);
         }
 
@@ -34,15 +30,11 @@ namespace MIO.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropColumn(
-                name: "Feedback",
-                table: "ProblemStudents");
-
-            migrationBuilder.DropColumn(
-                name: "GradedAt",
-                table: "ProblemStudents");
-
-            migrationBuilder.DropColumn(
                 name: "Score",
+                table: "ProblemStudents");
+
+            migrationBuilder.DropColumn(
+                name: "Feedback",
                 table: "ProblemStudents");
         }
     }
