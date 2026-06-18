@@ -56,7 +56,9 @@ namespace MIO.Infrastructure.Services
 
         // Ensure a user with the Student/Trainer role has the matching entity row,
         // so they appear in GET /Student and GET /Trainer (and can join groups).
-        private async Task EnsureRoleProfile(User user)
+        // studentAccepted: admin-created students are accepted immediately;
+        // public self-registrations start pending so an admin approves them.
+        private async Task EnsureRoleProfile(User user, bool studentAccepted = true)
         {
             if (user.RoleID == Role.Student &&
                 !await _dbContext.Students.AnyAsync(s => s.UserId == user.Id))
@@ -68,7 +70,7 @@ namespace MIO.Infrastructure.Services
                     City = "",
                     SchoolName = "",
                     NationalId = "",
-                    IsAccepted = true
+                    IsAccepted = studentAccepted
                 });
                 await _dbContext.SaveChangesAsync();
             }
@@ -111,7 +113,8 @@ namespace MIO.Infrastructure.Services
 
             _dbContext.Users.Add(user);
             await _dbContext.SaveChangesAsync();
-            await EnsureRoleProfile(user);
+            // Public registration → pending until an admin approves on the Approvals page.
+            await EnsureRoleProfile(user, studentAccepted: false);
             return user;
         }
 
@@ -124,6 +127,17 @@ namespace MIO.Infrastructure.Services
 
             if (!Security.VerifyPasswordHash(request.Password, user.PasswordHash, user.PasswordSalt))
                 throw new AppException("INVALID_CREDENTIALS", "Invalid username or password", StatusCodes.Status401Unauthorized);
+
+            // Block login for students whose account is still pending admin approval.
+            if (user.RoleID == Role.Student)
+            {
+                var student = await _dbContext.Students.FirstOrDefaultAsync(s => s.UserId == user.Id);
+                if (student != null && !student.IsAccepted)
+                    throw new AppException(
+                        "ACCOUNT_PENDING",
+                        "Your account is pending admin approval",
+                        StatusCodes.Status403Forbidden);
+            }
 
             return user;
         }
