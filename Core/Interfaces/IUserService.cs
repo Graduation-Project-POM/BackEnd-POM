@@ -27,5 +27,8 @@ namespace MIO.Core.Interfaces
 
         Task<User?> DeleteUserService(int id);
 
+        Task<UserResponseDTO?> GetCurrentUserService();
+        Task<User?> UpdateCurrentUserService(UpdateUserDTO userDTO);
+
     }
 }

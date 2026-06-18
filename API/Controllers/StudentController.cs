@@ -48,6 +48,30 @@ namespace MIO.API.Controllers
         }
 
         [HttpGet]
+        [Route("me")]
+        [Authorize(Roles = "Student")]
+        public async Task<ActionResult<StudentResponseDTO>> GetMyProfile()
+        {
+            return Ok(await _studentService.GetMyStudentService());
+        }
+
+        [HttpPut]
+        [Route("me")]
+        [Authorize(Roles = "Student")]
+        public async Task<ActionResult> UpdateMyProfile(UpdateStudentDTO studentDTO)
+        {
+            if (studentDTO == null)
+                return BadRequest("Student data cannot be null");
+
+            var updated = await _studentService.UpdateMyStudentService(studentDTO);
+            return Ok(new
+            {
+                message = "Profile updated successfully",
+                studentId = updated!.Id
+            });
+        }
+
+        [HttpGet]
         [Route("{id}")]
         [Authorize(Policy = "StudentOwnerOrAdminOrTrainer")]
         public async Task<ActionResult> GetStudentById(int id)

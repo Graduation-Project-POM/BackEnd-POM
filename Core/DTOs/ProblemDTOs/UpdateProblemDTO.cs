@@ -6,8 +6,7 @@ public class UpdateProblemDto
     [Required, MaxLength(255)]
     public string Title { get; set; }
 
-    [Required]
-    public string Statement { get; set; }
+    public string? Statement { get; set; }
 
     // No [MaxLength]: Difficulty is an enum; MaxLength only applies to
     // strings/arrays and throws at validation time otherwise.
@@ -17,6 +16,7 @@ public class UpdateProblemDto
     [Required, MaxLength(255)]
     public string Topic { get; set; }
 
+    [Url, MaxLength(500)]
     // No [Url]: images are stored as relative paths (e.g. "/uploads/x.png"),
     // which [Url] would reject. Nullable so an empty value clears the image.
     [MaxLength(500)]

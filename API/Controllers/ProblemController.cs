@@ -54,14 +54,14 @@ public class ProblemsController : ControllerBase
     //     _s3Service = s3Service;
     // }
     [HttpGet]
-    [Authorize(Roles ="Admin,Trainer")]
+    [Authorize(Roles ="Admin,Trainer,Student")]
     public async Task<ActionResult<IEnumerable<ProblemResponseDTO>>> GetAll()
     {
         return Ok(await _Problemservice.GetAll());
     }
 
     [HttpGet("{id}")]
-    [Authorize(Roles ="Admin,Trainer")]
+    [Authorize(Roles ="Admin,Trainer,Student")]
     public async Task<ActionResult<ProblemResponseDTO>> Get(int id)
     {
         if (id <= 0)
@@ -106,7 +106,7 @@ public class ProblemsController : ControllerBase
     }
 
     [HttpDelete("{id}")]
-    [Authorize(Roles ="Admin")]
+    [Authorize(Roles ="Admin,Trainer")]
     public async Task<ActionResult> Delete(int id)
     {
         if (id <= 0)
@@ -131,21 +131,32 @@ public class ProblemsController : ControllerBase
         return Ok(result);
     }
 
-    // GET /api/Problems/5/submissions — students' submissions to a problem (for grading).
     [HttpGet("{id}/submissions")]
     [Authorize(Roles = "Admin,Trainer")]
-    public async Task<ActionResult<IEnumerable<SubmissionDto>>> GetSubmissions(int id)
+    public async Task<ActionResult<IEnumerable<SubmissionResponseDto>>> GetSubmissions(int id)
     {
-        var submissions = await _Problemservice.GetSubmissionsForProblem(id);
-        return Ok(submissions);
+        if (id <= 0)
+            return BadRequest("Invalid ID");
+
+        return Ok(await _Problemservice.GetSubmissions(id));
     }
 
-    // POST /api/Problems/submissions/12/grade — instructor records a mark + feedback.
-    [HttpPost("submissions/{submissionId}/grade")]
-    [Authorize(Roles = "Admin,Trainer")]
-    public async Task<ActionResult<SubmissionDto>> GradeSubmission(int submissionId, GradeSubmissionDto dto)
+    [HttpGet("my/submissions")]
+    [Authorize(Roles = "Student")]
+    public async Task<ActionResult<IEnumerable<SubmissionResponseDto>>> GetMySubmissions()
     {
+        return Ok(await _Problemservice.GetMySubmissions());
+    }
+
+    [HttpPut("submissions/{submissionId}/grade")]
+    [Authorize(Roles = "Admin,Trainer")]
+    public async Task<ActionResult> GradeSubmission(int submissionId, GradeSubmissionDto dto)
+    {
+        if (submissionId <= 0)
+            return BadRequest("Invalid ID");
+
         var result = await _Problemservice.GradeSubmission(submissionId, dto);
         return Ok(result);
     }
+
 }

@@ -211,6 +211,12 @@ namespace MIO.Infrastructure.Services
             return existingUser;
         }
 
+        public Task<UserResponseDTO?> GetCurrentUserService()
+            => GetUserByIDService(_currentUser.UserId);
+
+        public Task<User?> UpdateCurrentUserService(UpdateUserDTO userDTO)
+            => UpdateUserService(_currentUser.UserId, userDTO);
+
         public async Task<User?> DeleteUserService(int id)
         {
             var existingUser = await _dbContext.Users.FindAsync(id);

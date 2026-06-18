@@ -384,8 +384,8 @@ namespace MIO.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("Feedback")
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<int?>("Grade")
+                        .HasColumnType("int");
 
                     b.Property<DateTime?>("GradedAt")
                         .HasColumnType("datetime2");

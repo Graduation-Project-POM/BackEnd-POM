@@ -20,7 +20,7 @@ public class Problem
 
     [MaxLength(255)]
     public string Topic { get; set; }
-    
+
 
     [MaxLength(500)]
     public string? PhotoFileKey { get; set; }

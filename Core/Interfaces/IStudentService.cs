@@ -16,6 +16,9 @@ namespace MIO.Core.Interfaces
         Task<Student?> UpdateStudentService(int id, UpdateStudentDTO studentDTO);
         Task<Student?> DeleteStudentService(int id);
 
+        Task<StudentResponseDTO?> GetMyStudentService();
+        Task<Student?> UpdateMyStudentService(UpdateStudentDTO studentDTO);
+
        
         Task<IEnumerable<StudentResponseDTO>> GetAcceptedStudentsService();
         Task<IEnumerable<StudentResponseDTO>> GetStudentsByCityService(string city);

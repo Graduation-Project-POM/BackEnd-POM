@@ -17,6 +17,7 @@ public class ProblemStudent
 
     public DateTime SubmittedAt { get; set; } = DateTime.UtcNow;
 
+    public int? Grade { get; set; }
     public int? Score { get; set; }
     public string? Feedback { get; set; }
     public DateTime? GradedAt { get; set; }
