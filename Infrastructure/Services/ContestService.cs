@@ -244,8 +244,10 @@ public class ContestService:IContestService
         if (dto.EndAt.HasValue)
             contest.EndAt = dto.EndAt.Value;
 
-        // Update problems if provided
-        if (dto.ProblemIds != null && dto.ProblemIds.Any())
+        // Replace the problem set whenever the caller supplies the list.
+        // A null list means "leave problems unchanged" (partial update); an
+        // empty list explicitly clears all problems (e.g. removing the last one).
+        if (dto.ProblemIds != null)
         {
             var problems = await _dbContext.Problems
                 .Where(p => dto.ProblemIds.Contains(p.ID))

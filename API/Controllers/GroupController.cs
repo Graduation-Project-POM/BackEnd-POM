@@ -39,7 +39,7 @@ public class GroupController : ControllerBase
 
     // POST /group
     [HttpPost]
-    [Authorize(Roles = "Trainer")]
+    [Authorize(Roles = "Admin,Trainer")]
     public async Task<ActionResult> Create(CreateGroupDto dto)
     {
         var created = await _groupService.CreateAsync(dto);
@@ -52,7 +52,7 @@ public class GroupController : ControllerBase
 
     // PUT /group/5
     [HttpPut("{id}")]
-    [Authorize(Roles = "Trainer")]
+    [Authorize(Roles = "Admin,Trainer")]
     public async Task<ActionResult> Update(int id, UpdateGroupDto dto)
     {
         await _groupService.UpdateAsync(id, dto);
@@ -98,7 +98,7 @@ public class GroupController : ControllerBase
         return Ok(new { message = "Student removed from group successfully" });
     }
 
-    // ── Contests ──────────────────────────────────────────────
+    // ── Contests ─────────────────────────────────────────────
 
     // GET /group/5/contests
     [HttpGet("{id}/contests")]
@@ -112,7 +112,7 @@ public class GroupController : ControllerBase
     
     // POST /group/5/contests
     [HttpPost("{id}/contests")]
-    [Authorize(Roles = "Trainer")]
+    [Authorize(Roles = "Admin,Trainer")]
     public async Task<ActionResult> AddContest(int id, AddContestToGroupDto dto)
     {
         await _groupService.AddContestAsync(id, dto.ContestId);

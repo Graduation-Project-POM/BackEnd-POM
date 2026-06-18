@@ -14,7 +14,7 @@ public class GroupService(AppDbContext db) : IGroupService
     public async Task<IEnumerable<GroupResponseDto>> GetAllAsync()
     {
         return await db.Groups
-            .Select(g => new GroupResponseDto(g.Id, g.Name, g.Description, g.StartDate, g.TrainerId))
+            .Select(g => new GroupResponseDto(g.Id, g.Name, g.Description, g.StartDate, g.TrainerId ?? 0, g.GroupStudents.Count))
             .ToListAsync();
     }
 
@@ -22,7 +22,7 @@ public class GroupService(AppDbContext db) : IGroupService
     {
         var group = await db.Groups
             .Where(g => g.Id == id)
-            .Select(g => new GroupResponseDto(g.Id, g.Name, g.Description, g.StartDate, g.TrainerId))
+            .Select(g => new GroupResponseDto(g.Id, g.Name, g.Description, g.StartDate, g.TrainerId ?? 0, g.GroupStudents.Count))
             .FirstOrDefaultAsync();
 
         if (group is null)
@@ -33,21 +33,28 @@ public class GroupService(AppDbContext db) : IGroupService
 
     public async Task<GroupResponseDto> CreateAsync(CreateGroupDto dto)
     {
-        bool trainerExists = await db.Trainers.AnyAsync(t => t.Id == dto.TrainerId);
-        if (!trainerExists)
-            throw new AppException($"Trainer with ID {dto.TrainerId} not found", StatusCodes.Status404NotFound);
+        // A trainer owns the group when a valid TrainerId is supplied; admins may
+        // create groups with no owning trainer (TrainerId stays null).
+        int? trainerId = null;
+        if (dto.TrainerId > 0)
+        {
+            bool trainerExists = await db.Trainers.AnyAsync(t => t.Id == dto.TrainerId);
+            if (!trainerExists)
+                throw new AppException($"Trainer with ID {dto.TrainerId} not found", StatusCodes.Status404NotFound);
+            trainerId = dto.TrainerId;
+        }
 
         var group = new Group
         {
             Name = dto.Name,
             Description = dto.Description,
-            TrainerId = dto.TrainerId
+            TrainerId = trainerId
         };
 
         db.Groups.Add(group);
         await db.SaveChangesAsync();
 
-        return new GroupResponseDto(group.Id, group.Name, group.Description, group.StartDate, group.TrainerId);
+        return new GroupResponseDto(group.Id, group.Name, group.Description, group.StartDate, group.TrainerId ?? 0, 0);
     }
 
     public async Task<bool> UpdateAsync(int id, UpdateGroupDto dto)

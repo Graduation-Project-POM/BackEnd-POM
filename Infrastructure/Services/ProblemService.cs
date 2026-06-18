@@ -57,10 +57,13 @@ public class ProblemService : IProblemServices
         {
             ID = p.ID,
             Title = p.Title,
+            Statement = p.Statement,
             Difficulty = p.Difficulty,
             Topic = p.Topic,
             IsPublished = p.IsPublished,
-            //PhotoUrl = string.IsNullOrEmpty(p.PhotoFileKey) ? null : _s3Service.GetPublicUrl(p.PhotoFileKey)
+            // S3 URL building is disabled; expose the stored key/URL as-is so the
+            // client can render it when a full URL was saved.
+            PhotoUrl = string.IsNullOrEmpty(p.PhotoFileKey) ? null : p.PhotoFileKey,
         };
     }
 
@@ -115,14 +118,12 @@ public class ProblemService : IProblemServices
                 StatusCodes.Status404NotFound);
         }
 
-        if (!string.IsNullOrEmpty(dto.PhotoFileKey) && dto.PhotoFileKey != problem.PhotoFileKey)
-        {
-            // if (!string.IsNullOrEmpty(problem.PhotoFileKey))
-            //     await _s3Service.DeleteMediaAsync(problem.PhotoFileKey);
+        // The edit form always sends the current image value, so apply it
+        // directly: a new value updates it, an empty value clears it.
+        problem.PhotoFileKey = string.IsNullOrWhiteSpace(dto.PhotoFileKey)
+            ? null
+            : dto.PhotoFileKey;
 
-            problem.PhotoFileKey = dto.PhotoFileKey;
-        }
-        
         problem.Title = dto.Title;
         problem.Statement = dto.Statement;
         problem.Difficulty = dto.Difficulty;

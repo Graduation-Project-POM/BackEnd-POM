@@ -55,7 +55,7 @@ namespace MIO.Migrations
                     b.Property<DateOnly>("StartDate")
                         .HasColumnType("date");
 
-                    b.Property<int>("TrainerId")
+                    b.Property<int?>("TrainerId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
@@ -258,7 +258,7 @@ namespace MIO.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<int>("TrainerId")
+                    b.Property<int?>("TrainerId")
                         .HasColumnType("int");
 
                     b.HasKey("Id");
@@ -477,9 +477,7 @@ namespace MIO.Migrations
                 {
                     b.HasOne("MIO.Core.Entities.Trainer", "Trainer")
                         .WithMany()
-                        .HasForeignKey("TrainerId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("TrainerId");
 
                     b.Navigation("Trainer");
                 });
@@ -530,8 +528,7 @@ namespace MIO.Migrations
                     b.HasOne("MIO.Core.Entities.Trainer", "trainer")
                         .WithMany("Contests")
                         .HasForeignKey("TrainerId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.Navigation("trainer");
                 });

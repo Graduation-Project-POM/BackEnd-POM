@@ -1,3 +1,4 @@
+using Microsoft.Extensions.FileProviders;
 using MIO.API.Extensions;
 using MIO.API.Middlewares;
 using MIO.Core.Entities;
@@ -9,18 +10,17 @@ using MIO2.Infrastructure.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Single source of truth for where uploaded files (problem images) live, so the
+// save path and the static-serve path can never drift apart.
+var webRootPath = Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
+Directory.CreateDirectory(Path.Combine(webRootPath, "uploads"));
 
-// ======================================
-// Controllers
-// ======================================
+
+
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 
-
-// ======================================
-// Custom Extensions
-// ======================================
 
 builder.Services.AddDatabase(builder.Configuration);
 
@@ -43,16 +43,12 @@ builder.Services.AddApiRateLimiter();
 
 
 
-// // ======================================
-// // Cors Policy
-// // ======================================
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
         policy
-            // Allow any localhost / 127.0.0.1 origin regardless of port,
-            // so the Vite dev server works whatever port it lands on.
             .SetIsOriginAllowed(origin =>
                 Uri.TryCreate(origin, UriKind.Absolute, out var uri) &&
                 (uri.Host == "localhost" || uri.Host == "127.0.0.1"))
@@ -61,10 +57,6 @@ builder.Services.AddCors(options =>
     });
 });
 
-
-// ======================================
-// Build App
-// ======================================
 
 var app = builder.Build();
 
@@ -115,6 +107,44 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+// Backfill Student/Trainer profiles for users that have those roles but no
+// entity row yet (so they appear in GET /Student and GET /Trainer).
+using (var scope = app.Services.CreateScope())
+{
+    try
+    {
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var studentUserIds = db.Students.Select(s => s.UserId).ToHashSet();
+        var trainerUserIds = db.Trainers.Select(tr => tr.UserId).ToHashSet();
+
+        foreach (var u in db.Users.ToList())
+        {
+            if (u.RoleID == Role.Student && !studentUserIds.Contains(u.Id))
+            {
+                db.Students.Add(new Student
+                {
+                    UserId = u.Id,
+                    GradeLevel = "",
+                    City = "",
+                    SchoolName = "",
+                    NationalId = "",
+                    IsAccepted = true
+                });
+            }
+            else if (u.RoleID == Role.Trainer && !trainerUserIds.Contains(u.Id))
+            {
+                db.Trainers.Add(new Trainer { UserId = u.Id, Specialization = "" });
+            }
+        }
+
+        db.SaveChanges();
+    }
+    catch (Exception ex)
+    {
+        app.Logger.LogError(ex, "Role profile backfill failed");
+    }
+}
+
 // ======================================
 // Swagger
 // ======================================
@@ -149,6 +179,14 @@ using (var scope = app.Services.CreateScope())
 app.UseMiddleware<ExceptionMiddleWare>();
 
 app.UseHttpsRedirection();
+
+// Serve uploaded files (problem images, etc.). Explicit provider so it works
+// regardless of how the host resolved WebRootPath.
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(webRootPath),
+    RequestPath = "",
+});
 
 app.UseCors("AllowFrontend");
 
