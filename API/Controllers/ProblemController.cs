@@ -21,7 +21,8 @@ public class ProblemsController : ControllerBase
 
     [HttpPost("upload-image")]
     [Authorize(Roles = "Admin,Trainer,Student")]
-    public async Task<ActionResult> UploadImage([FromForm] IFormFile file)
+    [Consumes("multipart/form-data")]
+    public async Task<ActionResult> UploadImage(IFormFile file)
     {
         if (file is null || file.Length == 0)
             return BadRequest(new { message = "No file uploaded." });
