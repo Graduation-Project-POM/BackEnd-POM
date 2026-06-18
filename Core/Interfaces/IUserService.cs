@@ -27,7 +27,6 @@ namespace MIO.Core.Interfaces
 
         Task<User?> DeleteUserService(int id);
 
-        // Logged-in user's own account (self-service).
         Task<UserResponseDTO?> GetCurrentUserService();
         Task<User?> UpdateCurrentUserService(UpdateUserDTO userDTO);
 

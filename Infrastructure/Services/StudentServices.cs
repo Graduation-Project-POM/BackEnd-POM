@@ -196,7 +196,6 @@ namespace MIO.Infrastructure.Services
             return existingStudent;
         }
 
-        // Resolve (or auto-create) the Student profile for the logged-in user.
         private async Task<Student> GetOrCreateCurrentStudent()
         {
             var userId = _currentUser.UserId;

@@ -11,9 +11,7 @@ namespace MIO.Migrations
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            // The ProblemStudents table was defined in the model/snapshot but had
-            // never actually been created in the database. Create it here, with the
-            // Grade/GradedAt columns included.
+           
             migrationBuilder.CreateTable(
                 name: "ProblemStudents",
                 columns: table => new

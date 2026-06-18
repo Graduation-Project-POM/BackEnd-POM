@@ -14,7 +14,6 @@ public class SubmissionResponseDto
     public int? Grade { get; set; }
     public DateTime SubmittedAt { get; set; }
 
-    // Problem details (populated for the student's own submissions list/details).
     public string? ProblemTitle { get; set; }
     public string? ProblemTopic { get; set; }
     public string? ProblemStatement { get; set; }

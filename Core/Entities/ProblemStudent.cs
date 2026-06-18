@@ -17,7 +17,6 @@ public class ProblemStudent
 
     public DateTime SubmittedAt { get; set; } = DateTime.UtcNow;
 
-    // Grade given by a trainer/admin (0-100). Null = not graded yet.
     public int? Grade { get; set; }
     public DateTime? GradedAt { get; set; }
 }

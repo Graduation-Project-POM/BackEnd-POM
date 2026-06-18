@@ -47,15 +47,12 @@ public class ProblemService : IProblemServices
 
         if (role == "Student")
         {
-            // Students only see published problems.
             query = query.Where(p => p.IsPublished);
         }
         else if (role == "Trainer")
         {
-            // Trainers see published problems plus their own drafts (not other trainers').
             query = query.Where(p => p.IsPublished || (myTrainerId != null && p.TrainerID == myTrainerId));
         }
-        // Admins see everything (published + all drafts).
 
         return await query.Select(p => new ProblemResponseDTO
         {
@@ -94,7 +91,6 @@ public class ProblemService : IProblemServices
                 .FirstOrDefaultAsync(t => t.UserId == _currentUser.UserId))?.Id;
         }
 
-        // Students only see published problems.
         if (role == "Student" && !p.IsPublished)
         {
             throw new AppException(
@@ -102,7 +98,6 @@ public class ProblemService : IProblemServices
                 StatusCodes.Status404NotFound);
         }
 
-        // Trainers can only open a draft they created.
         if (role == "Trainer" && !p.IsPublished && (myTrainerId == null || p.TrainerID != myTrainerId))
         {
             throw new AppException(
@@ -130,11 +125,8 @@ public class ProblemService : IProblemServices
        var isAdmin = _currentUser.Role == "Admin";
        var trainer=await _context.Trainers.FirstOrDefaultAsync(t => t.UserId == userID);
 
-        // Trainers own the problems they create; admins may also create (no owner).
         if (trainer == null && !isAdmin)
         {
-            // A Trainer-role user may not have a Trainer profile row yet (profiles are
-            // created separately). Auto-provision a minimal one so they can create problems.
             if (_currentUser.Role == "Trainer")
             {
                 trainer = new Trainer { UserId = userID, Specialization = "" };
@@ -218,7 +210,6 @@ public class ProblemService : IProblemServices
                 StatusCodes.Status404NotFound);
         }
 
-        // Trainers may only delete problems they created; admins can delete any.
         if (_currentUser.Role == "Trainer")
         {
             var trainer = await _context.Trainers
@@ -251,8 +242,6 @@ public class ProblemService : IProblemServices
         var userId = _currentUser.UserId;
         var student = await _context.Students.FirstOrDefaultAsync(s => s.UserId == userId);
 
-        // A Student-role user may not yet have a Student profile row (profiles are
-        // created separately). Auto-provision a minimal one so they can submit.
         if (student == null)
         {
             var user = await _context.Users.FindAsync(userId);
@@ -275,7 +264,6 @@ public class ProblemService : IProblemServices
         if (string.IsNullOrWhiteSpace(dto.SolutionText) && string.IsNullOrWhiteSpace(dto.PhotoFileKey))
             throw new AppException("You must provide a solution text or a photo", StatusCodes.Status400BadRequest);
 
-        // One submission per student per problem.
         bool alreadySubmitted = await _context.ProblemStudents
             .AnyAsync(ps => ps.ProblemId == problemId && ps.StudentId == student.Id);
         if (alreadySubmitted)
