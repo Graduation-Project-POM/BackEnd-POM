@@ -12,11 +12,12 @@ namespace MIO.Infrastructure.Services
             if (user?.Identity?.IsAuthenticated != true)
                 return;
 
-            UserId = int.Parse(user.FindFirstValue(ClaimTypes.NameIdentifier)!);
-                UserName = user.Identity!.Name!;
-                Role = user.FindFirstValue(ClaimTypes.Role)!;
-            
-            
+   
+            if (int.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out var id))
+                UserId = id;
+            UserName = user.Identity.Name;
+            Role = user.FindFirstValue(ClaimTypes.Role);
+
         }
 
         public  int UserId { get; }

@@ -13,6 +13,11 @@ namespace MIO.Core.Configurations
                 .WithOne(s=>s.Student)
                 .HasForeignKey<Student>(t=>t.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Property(s => s.GradeLevel).HasMaxLength(50);
+            builder.Property(s => s.City).HasMaxLength(100);
+            builder.Property(s => s.SchoolName).HasMaxLength(150);
+            builder.Property(s => s.NationalId).HasMaxLength(20);
         }
     }
 }

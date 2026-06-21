@@ -11,11 +11,15 @@ namespace MIO.Core.Configurations
         {
             builder.HasOne(gs => gs.Group)
                 .WithMany(g => g.GroupStudents)
-                .HasForeignKey(gs => gs.GroupId);
-            
+                .HasForeignKey(gs => gs.GroupId)
+                .OnDelete(DeleteBehavior.Cascade);
+
             builder.HasOne(gs => gs.Student)
-                .WithMany(s => s.GroupStudents)  
-                .HasForeignKey(gs => gs.StudentId);
+                .WithMany(s => s.GroupStudents)
+                .HasForeignKey(gs => gs.StudentId)
+                .OnDelete(DeleteBehavior.Cascade);
+
+            builder.HasIndex(gs => new { gs.GroupId, gs.StudentId }).IsUnique();
         }
     }
 }

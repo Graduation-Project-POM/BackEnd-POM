@@ -17,7 +17,9 @@ public class ContestConfiguration :IEntityTypeConfiguration<Contest>
             .WithOne(cs => cs.Contest)
             .HasForeignKey(cs => cs.ContestId)
             .OnDelete(DeleteBehavior.Cascade);
-        
+
+        builder.Property(c => c.Title).IsRequired().HasMaxLength(200);
+        builder.Property(c => c.Description).HasMaxLength(2000);
     }
 
    

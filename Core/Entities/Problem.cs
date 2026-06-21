@@ -15,7 +15,6 @@ public class Problem
 
     public string Statement { get; set; }
 
-    [MaxLength(50)]
     public Difficulty Difficulty { get; set; }
 
     [MaxLength(255)]

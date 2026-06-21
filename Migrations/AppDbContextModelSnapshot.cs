@@ -46,11 +46,13 @@ namespace MIO.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Description")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
 
                     b.Property<DateOnly>("StartDate")
                         .HasColumnType("date");
@@ -86,7 +88,8 @@ namespace MIO.Migrations
 
                     b.HasIndex("ContestId");
 
-                    b.HasIndex("GroupId");
+                    b.HasIndex("GroupId", "ContestId")
+                        .IsUnique();
 
                     b.ToTable("GroupContests");
                 });
@@ -101,11 +104,13 @@ namespace MIO.Migrations
 
                     b.Property<string>("City")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("GradeLevel")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<bool>("IsAccepted")
                         .HasColumnType("bit");
@@ -115,14 +120,16 @@ namespace MIO.Migrations
 
                     b.Property<string>("NationalId")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(20)
+                        .HasColumnType("nvarchar(20)");
 
                     b.Property<int>("ProblemSolved")
                         .HasColumnType("int");
 
                     b.Property<string>("SchoolName")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
 
                     b.Property<int>("Score")
                         .HasColumnType("int");
@@ -148,7 +155,8 @@ namespace MIO.Migrations
 
                     b.Property<string>("Specialization")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(150)
+                        .HasColumnType("nvarchar(150)");
 
                     b.Property<int>("UserId")
                         .HasColumnType("int");
@@ -170,35 +178,41 @@ namespace MIO.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Bio")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("Email")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(256)
+                        .HasColumnType("nvarchar(256)");
 
                     b.Property<string>("FirstName")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<string>("Gender")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(16)
+                        .HasColumnType("nvarchar(16)");
 
                     b.Property<bool>("IsActive")
                         .HasColumnType("bit");
 
                     b.Property<string>("LastName")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<DateTime>("LastUpdatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("MiddleName")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(100)
+                        .HasColumnType("nvarchar(100)");
 
                     b.Property<byte[]>("PasswordHash")
                         .IsRequired()
@@ -209,17 +223,20 @@ namespace MIO.Migrations
                         .HasColumnType("varbinary(max)");
 
                     b.Property<string>("PhoneNumber")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(32)
+                        .HasColumnType("nvarchar(32)");
 
                     b.Property<string>("ProfileImageUrl")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<DateTime?>("RefreshTokenExpiresAt")
                         .HasColumnType("datetime2");
 
                     b.Property<string>("RefreshTokenHash")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(128)
+                        .HasColumnType("nvarchar(128)");
 
                     b.Property<DateTime?>("RefreshTokenRevokedAt")
                         .HasColumnType("datetime2");
@@ -229,9 +246,16 @@ namespace MIO.Migrations
 
                     b.Property<string>("UserName")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(64)
+                        .HasColumnType("nvarchar(64)");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.HasIndex("UserName")
+                        .IsUnique();
 
                     b.ToTable("Users");
                 });
@@ -245,7 +269,8 @@ namespace MIO.Migrations
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Description")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
 
                     b.Property<DateTime>("EndAt")
                         .HasColumnType("datetime2");
@@ -258,7 +283,8 @@ namespace MIO.Migrations
 
                     b.Property<string>("Title")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<int?>("TrainerId")
                         .HasColumnType("int");
@@ -295,9 +321,10 @@ namespace MIO.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ContestId");
-
                     b.HasIndex("StudentId");
+
+                    b.HasIndex("ContestId", "StudentId")
+                        .IsUnique();
 
                     b.ToTable("ContestStudents");
                 });
@@ -314,11 +341,13 @@ namespace MIO.Migrations
                         .HasColumnType("int");
 
                     b.Property<string>("Description")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
 
                     b.Property<string>("FileKey")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(500)
+                        .HasColumnType("nvarchar(500)");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("bit");
@@ -328,13 +357,15 @@ namespace MIO.Migrations
 
                     b.Property<string>("RefType")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(50)
+                        .HasColumnType("nvarchar(50)");
 
                     b.Property<long?>("Size")
                         .HasColumnType("bigint");
 
                     b.Property<string>("Title")
-                        .HasColumnType("nvarchar(max)");
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<string>("Type")
                         .IsRequired()
@@ -343,12 +374,9 @@ namespace MIO.Migrations
                     b.Property<int>("UploadedByID")
                         .HasColumnType("int");
 
-                    b.Property<int>("UserId")
-                        .HasColumnType("int");
-
                     b.HasKey("Id");
 
-                    b.HasIndex("UserId");
+                    b.HasIndex("UploadedByID");
 
                     b.ToTable("Gallery");
                 });
@@ -372,9 +400,10 @@ namespace MIO.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("GroupId");
-
                     b.HasIndex("StudentId");
+
+                    b.HasIndex("GroupId", "StudentId")
+                        .IsUnique();
 
                     b.ToTable("GroupStudents");
                 });
@@ -413,9 +442,10 @@ namespace MIO.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ProblemId");
-
                     b.HasIndex("StudentId");
+
+                    b.HasIndex("ProblemId", "StudentId")
+                        .IsUnique();
 
                     b.ToTable("ProblemStudents");
                 });
@@ -432,7 +462,6 @@ namespace MIO.Migrations
                         .HasColumnType("datetime2");
 
                     b.Property<int>("Difficulty")
-                        .HasMaxLength(50)
                         .HasColumnType("int");
 
                     b.Property<bool>("IsPublished")
@@ -555,7 +584,7 @@ namespace MIO.Migrations
                     b.HasOne("MIO.Core.Entities.Student", "Student")
                         .WithMany("ContestStudents")
                         .HasForeignKey("StudentId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Contest");
@@ -567,8 +596,8 @@ namespace MIO.Migrations
                 {
                     b.HasOne("MIO.Core.Entities.User", "User")
                         .WithMany()
-                        .HasForeignKey("UserId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .HasForeignKey("UploadedByID")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("User");
