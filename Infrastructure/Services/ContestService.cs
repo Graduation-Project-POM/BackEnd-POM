@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using MIO.API.Settings;
 using MIO.Core.DTOs.ContestDTOs;
 using MIO.Core.DTOs.ProblemDTOs;
+using MIO.Core.Entities;
 using MIO.Core.Interfaces;
 using MIO.Infrastructure;
 using MIO.Infrastructure.Services;
@@ -38,13 +39,24 @@ public class ContestService:IContestService
         {
             throw new AppException($"You must be a Trainer to create a contest", StatusCodes.Status403Forbidden);
         }
-        
-        
-        //Console.WriteLine($"UserId: {_currentUser.UserId}, TrainerId: {trainerId}");
-        
+
+        // A contest must be assigned to a group on creation.
+        if (createContestDTO.GroupId <= 0)
+            throw new AppException("GROUP_REQUIRED", "A contest must be assigned to a group.", StatusCodes.Status400BadRequest);
+
+        var group = await _dbContext.Groups
+            .FirstOrDefaultAsync(g => g.Id == createContestDTO.GroupId);
+        if (group == null)
+            throw new AppException($"Group with ID {createContestDTO.GroupId} not found", StatusCodes.Status404NotFound);
+
+        // Role-based enforcement: a trainer may only assign a contest to a group
+        // they own. Admins may assign to any group.
+        if (!isAdmin && group.TrainerId != trainerId)
+            throw new AppException("You can only assign contests to your own groups.", StatusCodes.Status403Forbidden);
+
         var problems = await _dbContext.Problems
             .Where(p => createContestDTO.ProblemIds.Contains(p.ID))
-            .ToListAsync(); 
+            .ToListAsync();
 
         var contest = new Contest
         {
@@ -57,7 +69,10 @@ public class ContestService:IContestService
             EndAt = createContestDTO.EndAt
         };
 
+        // Create the contest and link it to the group in one transaction so the
+        // contest always appears inside its assigned group.
         _dbContext.Contests.Add(contest);
+        _dbContext.GroupContests.Add(new GroupContest { Group = group, Contest = contest });
         await _dbContext.SaveChangesAsync();
         return contest;
 
@@ -72,7 +87,14 @@ public class ContestService:IContestService
             .FirstOrDefaultAsync(c => c.Id == contestId);
         if (contest == null)
             throw new AppException($"Contest with ID {contestId} not found", StatusCodes.Status404NotFound);
-        
+
+        // An ended contest is read-only — no further roster changes.
+        if (DateTime.UtcNow > contest.EndAt)
+            throw new AppException(
+                "CONTEST_ENDED",
+                "This contest has ended and can no longer be edited.",
+                StatusCodes.Status403Forbidden);
+
         var existingStudentIds = contest.ContestStudents
             .Select(cs => cs.StudentId)
             .ToList();
@@ -297,6 +319,14 @@ public class ContestService:IContestService
 
         if (!isAdmin && !await CanTrainerManageContestAsync(contestId, contest.TrainerId, trainerId))
             throw new AppException("You are not authorized to update this contest", StatusCodes.Status403Forbidden);
+
+        // Once a contest has ended it is read-only — no field (title, description,
+        // dates, status, problems) may be changed by anyone, including admins.
+        if (DateTime.UtcNow > contest.EndAt)
+            throw new AppException(
+                "CONTEST_ENDED",
+                "This contest has ended and can no longer be edited.",
+                StatusCodes.Status403Forbidden);
 
         if (!string.IsNullOrWhiteSpace(dto.Title))
             contest.Title = dto.Title;
