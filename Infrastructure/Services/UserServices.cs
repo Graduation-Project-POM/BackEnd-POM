@@ -163,6 +163,7 @@ namespace MIO.Infrastructure.Services
                 PhoneNumber = user.PhoneNumber,
                 Gender = user.Gender,
                 ProfileImageUrl = user.ProfileImageUrl,
+                Bio = user.Bio,
                 IsActive = user.IsActive,
                 CreatedAt = user.CreatedAt,
                 LastUpdatedAt = user.LastUpdatedAt,
@@ -219,6 +220,7 @@ namespace MIO.Infrastructure.Services
             existingUser.PhoneNumber = userDTO.PhoneNumber;
             existingUser.Gender = userDTO.Gender;
             existingUser.ProfileImageUrl = userDTO.ProfileImageUrl;
+            existingUser.Bio = userDTO.Bio;
             existingUser.LastUpdatedAt = DateTime.UtcNow;
 
             await _dbContext.SaveChangesAsync();
