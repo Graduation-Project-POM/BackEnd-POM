@@ -75,7 +75,7 @@ namespace MIO.Infrastructure.Services
                     accepted into the training program for the
                     <strong>Palestinian Mathematics Olympiad</strong>.
                 </p>
-                <p>Best regards,<br/>MIO Team</p>
+                <p>Best regards,<br/>The Palestinian Mathematics Olympiad Team</p>
                 """;
         }
 

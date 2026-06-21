@@ -14,4 +14,8 @@ public class createContestDTO
     public DateTime StartAt { get; set; }
     [Required]
     public DateTime EndAt { get; set; }
+
+    // A contest must be assigned to exactly one group on creation. Required.
+    [Required]
+    public int GroupId { get; set; }
 }

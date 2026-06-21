@@ -23,7 +23,15 @@ public class GroupService(AppDbContext db, ICurrentUserService currentUser) : IG
         var query = db.Groups.AsQueryable();
 
         if (!isAdmin)
+        {
+            // A trainer may only see the groups they own. A user with the Trainer
+            // role but no Trainer profile owns nothing — return an empty list
+            // rather than leaking unowned (TrainerId == null) groups.
+            if (trainerId == null)
+                return [];
+
             query = query.Where(g => g.TrainerId == trainerId);
+        }
 
         return await query
             .Select(g => new GroupResponseDto(
