@@ -45,7 +45,7 @@ namespace MIO.API.Controllers
         [HttpGet]
         [Route("")]
         [Authorize(Roles ="Admin")]
-        public async Task<ActionResult<IEnumerable<User>>> GetUsers()
+        public async Task<ActionResult<IEnumerable<UserResponseDTO>>> GetUsers()
         {
             var records = await userServices.GetUsersService();
             return Ok(records);

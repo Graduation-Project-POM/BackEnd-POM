@@ -2,6 +2,7 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Microsoft.IdentityModel.Tokens;
 using MIO.API.Settings;
@@ -24,25 +25,25 @@ public class AuthService :IAuthService
         _dbContext=dbContext;
     }
     
-    public AuthResponseDTO CreateToken(JwtOptions jwtOptions,User user)
-    { 
+    public async Task<AuthResponseDTO> CreateToken(JwtOptions jwtOptions,User user)
+    {
         var expires = DateTime.UtcNow.AddMinutes(jwtOptions.lifetime);
 
 
         var accessToken = GenerateAccessToken(jwtOptions, user);
 
-        
+
         var refreshToken = GenerateRefreshToken();
-        
+
         user.RefreshTokenHash = Security.HashRefreshToken(refreshToken);
         user.RefreshTokenExpiresAt = DateTime.UtcNow.AddDays(7);
         user.RefreshTokenRevokedAt = null;
-        _dbContext.SaveChanges();
+        await _dbContext.SaveChangesAsync();
 
-        var trainerId = _dbContext.Trainers
+        var trainerId = await _dbContext.Trainers
             .Where(t => t.UserId == user.Id)
             .Select(t => (int?)t.Id)
-            .FirstOrDefault();
+            .FirstOrDefaultAsync();
 
         return new AuthResponseDTO
         {
@@ -56,10 +57,10 @@ public class AuthService :IAuthService
         };
     }
     
-    public AuthResponseDTO Refresh(JwtOptions jwtOptions,RefreshRequest request,int userId)
+    public async Task<AuthResponseDTO> Refresh(JwtOptions jwtOptions,RefreshRequest request,int userId)
     {
-        var user = _dbContext.Users
-            .FirstOrDefault(u => u.Id == userId);
+        var user = await _dbContext.Users
+            .FirstOrDefaultAsync(u => u.Id == userId);
       
     
         if (user == null)
@@ -80,9 +81,9 @@ public class AuthService :IAuthService
         user.RefreshTokenHash = Security.HashRefreshToken(newRefreshToken);
         user.RefreshTokenExpiresAt = DateTime.UtcNow.AddDays(7);
         user.RefreshTokenRevokedAt = null;
-    
-        _dbContext.SaveChanges();
-    
+
+        await _dbContext.SaveChangesAsync();
+
         var newAccessToken = GenerateAccessToken(jwtOptions, user);
     
         return new AuthResponseDTO
@@ -92,10 +93,10 @@ public class AuthService :IAuthService
         };
     }
 
-    public bool LogOut(LogoutRequest request,int userId)
+    public async Task<bool> LogOut(LogoutRequest request,int userId)
     {
-        var user = _dbContext.Users
-            .FirstOrDefault(u => u.Id == userId);
+        var user = await _dbContext.Users
+            .FirstOrDefaultAsync(u => u.Id == userId);
         
         
         if (user == null )
@@ -110,7 +111,7 @@ public class AuthService :IAuthService
             return false;
         
         user.RefreshTokenRevokedAt = DateTime.UtcNow;
-        _dbContext.SaveChanges(); 
+        await _dbContext.SaveChangesAsync();
         return true;
         
     }

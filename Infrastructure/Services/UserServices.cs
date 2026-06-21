@@ -40,7 +40,7 @@ namespace MIO.Infrastructure.Services
                 PasswordHash = passwordHash,
                 PasswordSalt = passwordSalt,
                 PhoneNumber = userDTO.PhoneNumber,
-                Gender = userDTO.Gender,
+                Gender = userDTO.Gender!.Value,
                 ProfileImageUrl = userDTO.ProfileImageUrl,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
@@ -103,7 +103,7 @@ namespace MIO.Infrastructure.Services
                 PasswordHash = passwordHash,
                 PasswordSalt = passwordSalt,
                 PhoneNumber = userDTO.PhoneNumber,
-                Gender = userDTO.Gender,
+                Gender = userDTO.Gender!.Value,
                 ProfileImageUrl = userDTO.ProfileImageUrl,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
@@ -192,9 +192,47 @@ namespace MIO.Infrastructure.Services
             return userResponse;
         }
 
-        public async Task<IEnumerable<User>> GetUsersService()
+        public async Task<IEnumerable<UserResponseDTO>> GetUsersService()
         {
-            return await _dbContext.Users.ToListAsync();
+
+            return await _dbContext.Users
+                .Select(user => new UserResponseDTO
+                {
+                    Id = user.Id,
+                    FirstName = user.FirstName,
+                    MiddleName = user.MiddleName,
+                    LastName = user.LastName,
+                    Email = user.Email,
+                    UserName = user.UserName,
+                    PhoneNumber = user.PhoneNumber,
+                    Gender = user.Gender,
+                    ProfileImageUrl = user.ProfileImageUrl,
+                    Bio = user.Bio,
+                    IsActive = user.IsActive,
+                    CreatedAt = user.CreatedAt,
+                    LastUpdatedAt = user.LastUpdatedAt,
+                    BasicTrainer = user.Trainer != null
+                        ? new BasicTrainerDTO
+                        {
+                            Id = user.Trainer.Id,
+                            Specialization = user.Trainer.Specialization
+                        }
+                        : null,
+                    BasicStudent = user.Student != null
+                        ? new BasicStudentDTO
+                        {
+                            Id = user.Student.Id,
+                            City = user.Student.City,
+                            GradeLevel = user.Student.GradeLevel,
+                            JoinYear = user.Student.JoinYear,
+                            NationalId = user.Student.NationalId,
+                            ProblemSolved = user.Student.ProblemSolved,
+                            SchoolName = user.Student.SchoolName,
+                            Score = user.Student.Score
+                        }
+                        : null
+                })
+                .ToListAsync();
         }
 
         public async Task<User?> UpdateUserService(int id, UpdateUserDTO userDTO)
@@ -218,7 +256,7 @@ namespace MIO.Infrastructure.Services
             existingUser.Email = userDTO.Email;
             existingUser.UserName = userDTO.UserName;
             existingUser.PhoneNumber = userDTO.PhoneNumber;
-            existingUser.Gender = userDTO.Gender;
+            existingUser.Gender = userDTO.Gender!.Value;
             existingUser.ProfileImageUrl = userDTO.ProfileImageUrl;
             existingUser.Bio = userDTO.Bio;
             existingUser.LastUpdatedAt = DateTime.UtcNow;

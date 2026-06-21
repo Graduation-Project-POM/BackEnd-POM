@@ -11,6 +11,8 @@ public class ContestStudentConfiguration : IEntityTypeConfiguration<ContestStude
         builder.HasOne(cs => cs.Student)
             .WithMany(s => s.ContestStudents)
             .HasForeignKey(cs => cs.StudentId)
-            .OnDelete(DeleteBehavior.Restrict);
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasIndex(cs => new { cs.ContestId, cs.StudentId }).IsUnique();
     }
 }

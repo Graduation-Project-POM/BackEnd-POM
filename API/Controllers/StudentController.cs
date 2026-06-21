@@ -82,6 +82,7 @@ namespace MIO.API.Controllers
         }
 
         [HttpPost("batch")]
+        [Authorize(Roles = "Admin,Trainer")]
         public async Task<IActionResult> GetMultipleStudents([FromBody] GetMultipleStudentsDTO dto)
         {
             var result = await _studentService.GetMultipleStudentsService(dto.Ids);

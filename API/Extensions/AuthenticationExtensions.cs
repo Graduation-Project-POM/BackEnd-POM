@@ -13,7 +13,8 @@ public static class AuthenticationExtensions
     {
         var jwtOptions = configuration
             .GetSection("Jwt")
-            .Get<JwtOptions>();
+            .Get<JwtOptions>()
+            ?? throw new InvalidOperationException("Missing 'Jwt' configuration section.");
 
         services.AddSingleton(jwtOptions);
 
@@ -36,7 +37,9 @@ public static class AuthenticationExtensions
 
                         IssuerSigningKey =
                             new SymmetricSecurityKey(
-                                Encoding.UTF8.GetBytes(jwtOptions.signingkey))
+                                Encoding.UTF8.GetBytes(jwtOptions.signingkey)),
+                        ValidateLifetime = true,
+                        ClockSkew = TimeSpan.Zero
                     };
             });
 

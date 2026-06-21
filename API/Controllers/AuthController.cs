@@ -34,7 +34,7 @@ public class AuthController(JwtOptions jwtOptions,IUserService userServices, IAu
         if (user ==null)
             return Unauthorized("Invalid username or password");
 
-        var accessToken = authService.CreateToken(jwtOptions, user);
+        var accessToken = await authService.CreateToken(jwtOptions, user);
 
 
         return Ok(accessToken);
@@ -43,22 +43,22 @@ public class AuthController(JwtOptions jwtOptions,IUserService userServices, IAu
     
     [HttpPost("refresh")]
     [EnableRateLimiting("AuthLimiter")]
-    public IActionResult Refresh([FromBody] RefreshRequest request)
+    public async Task<IActionResult> Refresh([FromBody] RefreshRequest request)
     {
         var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        
-        var refreshedToken = authService.Refresh(jwtOptions, request,userId);
+
+        var refreshedToken = await authService.Refresh(jwtOptions, request,userId);
         return Ok(refreshedToken);
 
     }
 
     [HttpPost("logout")]
-    public IActionResult Logout([FromBody] LogoutRequest request)
+    public async Task<IActionResult> Logout([FromBody] LogoutRequest request)
     {
-        
+
         var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-        
-        if (authService.LogOut(request,userId))
+
+        if (await authService.LogOut(request,userId))
             return Ok("Logged out successfully");
         else
         {

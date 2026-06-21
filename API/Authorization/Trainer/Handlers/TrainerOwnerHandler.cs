@@ -1,13 +1,21 @@
 namespace MIO2.API.Authorization.Trainer;
 
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.EntityFrameworkCore;
+using MIO.Infrastructure;
 using System.Security.Claims;
-
 
 public class TrainerOwnerHandler
     : AuthorizationHandler<TrainerOwnerRequirement, int>
 {
-    protected override Task HandleRequirementAsync(
+    private readonly AppDbContext _dbContext;
+
+    public TrainerOwnerHandler(AppDbContext dbContext)
+    {
+        _dbContext = dbContext;
+    }
+
+    protected override async Task HandleRequirementAsync(
         AuthorizationHandlerContext context,
         TrainerOwnerRequirement requirement,
         int trainerId)
@@ -16,18 +24,17 @@ public class TrainerOwnerHandler
         if (context.User.IsInRole("Admin"))
         {
             context.Succeed(requirement);
-            return Task.CompletedTask;
+            return;
         }
 
-        // Ownership check
         var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (!int.TryParse(userId, out int currentUserId))
+            return;
 
-        if (int.TryParse(userId, out int authenticatedStudentId) &&
-            authenticatedStudentId == trainerId)
-        {
+        var isOwner = await _dbContext.Trainers
+            .AnyAsync(t => t.Id == trainerId && t.UserId == currentUserId);
+
+        if (isOwner)
             context.Succeed(requirement);
-        }
-
-        return Task.CompletedTask;
     }
 }

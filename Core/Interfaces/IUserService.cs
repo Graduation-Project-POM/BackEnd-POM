@@ -20,7 +20,7 @@ namespace MIO.Core.Interfaces
 
         
 
-        Task<IEnumerable<User>> GetUsersService();
+        Task<IEnumerable<UserResponseDTO>> GetUsersService();
 
         Task<User?> UpdateUserService(int id, UpdateUserDTO userDTO);
 

@@ -1,4 +1,5 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using MIO.Core.Enums;
 
 namespace MIO.Core.DTOs.UserDtos
 {
@@ -21,8 +22,7 @@ namespace MIO.Core.DTOs.UserDtos
             [Phone]
             public string? PhoneNumber { get; set; }
             [Required]
-            [RegularExpression("male|female", ErrorMessage = "Gender must be male or female")]
-            public required string Gender { get; set; }
+            public Gender? Gender { get; set; }
 
             public string ProfileImageUrl { get; set; }
 

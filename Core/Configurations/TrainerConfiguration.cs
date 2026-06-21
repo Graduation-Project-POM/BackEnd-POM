@@ -13,6 +13,8 @@ namespace MIO.Core.Configurations
                 .WithOne(u => u.Trainer)
                 .HasForeignKey<Trainer>(t => t.UserId)
                 .OnDelete(DeleteBehavior.Restrict);
+
+            builder.Property(t => t.Specialization).HasMaxLength(150);
         }
     }
 }

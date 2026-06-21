@@ -47,8 +47,6 @@ namespace MIO.API.Middlewares
                 {
                     status = 500,
                     code = "SERVER_ERROR",
-                    // In Development surface the real error (and inner exception)
-                    // so it's visible in the client/network tab; production stays generic.
                     message = _env.IsDevelopment()
                         ? (ex.InnerException?.Message ?? ex.Message)
                         : "An unexpected error occurred.",
@@ -57,39 +55,5 @@ namespace MIO.API.Middlewares
             }
 
         }
-
-
-        private async Task HandleException(HttpContext context, Exception ex)
-        {
-            var userId = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
-
-            _logger.LogError(ex,
-                "Error occurred. UserId: {UserId}, Path: {Path}",
-                userId,
-                context.Request.Path
-            );
-
-            context.Response.ContentType = "application/json";
-
-            var (statusCode, message) = ex switch
-            {
-                AppException appEx => (appEx.StatusCode, ex.Message),
-                _ => (StatusCodes.Status500InternalServerError, "An unexpected error occurred.") 
-            };
-
-            context.Response.StatusCode = statusCode;
-
-            var response = new
-            {
-                status = statusCode,
-                message
-            };
-
-            await context.Response.WriteAsJsonAsync(response);
-        }
-
-
-
-
     }
 }

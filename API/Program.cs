@@ -46,14 +46,28 @@ builder.Services.AddApiRateLimiter();
 
 builder.Services.AddCors(options =>
 {
+    
+    var corsOrigins = builder.Configuration
+        .GetSection("Cors:AllowedOrigins").Get<string[]>();
+
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy
-            .SetIsOriginAllowed(origin =>
-                Uri.TryCreate(origin, UriKind.Absolute, out var uri) &&
-                (uri.Host == "localhost" || uri.Host == "127.0.0.1"))
-            .AllowAnyHeader()
-            .AllowAnyMethod();
+        if (corsOrigins is { Length: > 0 })
+        {
+            policy
+                .WithOrigins(corsOrigins)
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        }
+        else
+        {
+            policy
+                .SetIsOriginAllowed(origin =>
+                    Uri.TryCreate(origin, UriKind.Absolute, out var uri) &&
+                    (uri.Host == "localhost" || uri.Host == "127.0.0.1"))
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        }
     });
 });
 
@@ -68,11 +82,17 @@ using (var scope = app.Services.CreateScope())
     {
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        Security.CreatePasswordHash("Admin1234", out byte[] hash, out byte[] salt);
-
+        // Seed the admin only if it does not already exist. The password is read from
+        // configuration (Seed:AdminPassword / env var Seed__AdminPassword) so a known
+        // value is never hardcoded, and an existing admin's password is NOT reset on
+        // every startup 
         var admin = db.Users.FirstOrDefault(u => u.UserName == "admin");
         if (admin == null)
         {
+            var adminPassword = builder.Configuration["Seed:AdminPassword"]
+                ?? "Admin1234"; // dev-only fallback; override in production config
+            Security.CreatePasswordHash(adminPassword, out byte[] hash, out byte[] salt);
+
             db.Users.Add(new User
             {
                 FirstName = "System",
@@ -83,23 +103,16 @@ using (var scope = app.Services.CreateScope())
                 PasswordHash = hash,
                 PasswordSalt = salt,
                 PhoneNumber = null,
-                Gender = "male",
+                Gender = Gender.Male,
                 ProfileImageUrl = "",
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
                 LastUpdatedAt = DateTime.UtcNow,
                 RoleID = Role.Admin
             });
-        }
-        else
-        {
-            admin.PasswordHash = hash;
-            admin.PasswordSalt = salt;
-            admin.RoleID = Role.Admin;
-            admin.IsActive = true;
-        }
 
-        db.SaveChanges();
+            db.SaveChanges();
+        }
     }
     catch (Exception ex)
     {
@@ -107,8 +120,7 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// Backfill Student/Trainer profiles for users that have those roles but no
-// entity row yet (so they appear in GET /Student and GET /Trainer).
+
 using (var scope = app.Services.CreateScope())
 {
     try
