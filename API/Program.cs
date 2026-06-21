@@ -1,5 +1,6 @@
 using Microsoft.Extensions.FileProviders;
 using MIO.API.Extensions;
+using MIO.API.Json;
 using MIO.API.Middlewares;
 using MIO.Core.Entities;
 using MIO.Core.Enums;
@@ -10,15 +11,18 @@ using MIO2.Infrastructure.Events;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Single source of truth for where uploaded files (problem images) live, so the
-// save path and the static-serve path can never drift apart.
 var webRootPath = Path.Combine(builder.Environment.ContentRootPath, "wwwroot");
 Directory.CreateDirectory(Path.Combine(webRootPath, "uploads"));
 
 
 
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.Converters.Add(new UtcDateTimeConverter());
+        options.JsonSerializerOptions.Converters.Add(new NullableUtcDateTimeConverter());
+    });
 builder.Services.AddEndpointsApiExplorer();
 
 
@@ -107,8 +111,6 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// Backfill Student/Trainer profiles for users that have those roles but no
-// entity row yet (so they appear in GET /Student and GET /Trainer).
 using (var scope = app.Services.CreateScope())
 {
     try
@@ -145,10 +147,6 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
-// ======================================
-// Swagger
-// ======================================
-
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -156,9 +154,6 @@ if (app.Environment.IsDevelopment())
 }
 
 
-// ======================================
-// Event Subscriptions
-// ======================================
 
 using (var scope = app.Services.CreateScope())
 {
@@ -170,18 +165,10 @@ using (var scope = app.Services.CreateScope())
 
 
 
-
-
-// ======================================
-// Middlewares
-// ======================================
-
 app.UseMiddleware<ExceptionMiddleWare>();
 
 app.UseHttpsRedirection();
 
-// Serve uploaded files (problem images, etc.). Explicit provider so it works
-// regardless of how the host resolved WebRootPath.
 app.UseStaticFiles(new StaticFileOptions
 {
     FileProvider = new PhysicalFileProvider(webRootPath),
@@ -192,22 +179,13 @@ app.UseCors("AllowFrontend");
 
 app.UseRateLimiter();
 
-//app.UseRateLimiterWithMessage();
 
 app.UseAuthentication();
 
 app.UseAuthorization();
 
 
-// ======================================
-// Endpoints
-// ======================================
-
 app.MapControllers();
 
-
-// ======================================
-// Run App
-// ======================================
 
 app.Run();

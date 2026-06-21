@@ -8,6 +8,22 @@ public static class RateLimiterExtensions
         {
             options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
+            options.OnRejected = async (context, token) =>
+            {
+                context.HttpContext.Response.ContentType = "application/json";
+
+                if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
+                    context.HttpContext.Response.Headers.RetryAfter =
+                        ((int)retryAfter.TotalSeconds).ToString();
+
+                await context.HttpContext.Response.WriteAsJsonAsync(new
+                {
+                    status = StatusCodes.Status429TooManyRequests,
+                    code = "RATE_LIMITED",
+                    message = "Too many login attempts. Please try again in a minute."
+                }, token);
+            };
+
             options.AddPolicy("AuthLimiter", httpContext =>
             {
                 var ip = httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
