@@ -23,4 +23,7 @@ public class StudentContestProblemDto
     public int? Score { get; set; }
     public string? Feedback { get; set; }
     public DateTime? GradedAt { get; set; }
+
+    public int Points { get; set; }
+    public int SolvedCount { get; set; }
 }

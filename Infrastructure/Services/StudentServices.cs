@@ -88,6 +88,8 @@ namespace MIO.Infrastructure.Services
                 NationalId = student.NationalId,
                 ProblemSolved = student.ProblemSolved,
                 Score = student.Score,
+                TotalPoints = student.TotalPoints,                  
+                Rank = await ComputeRankAsync(student.TotalPoints), 
                 JoinYear = student.JoinYear,
                 IsAccepted = student.IsAccepted,
                 BasicUser = new BasicUserDTO
@@ -101,6 +103,12 @@ namespace MIO.Infrastructure.Services
                 }
             };
         }
+
+        // Req 7: 1-based rank by TotalPoints (ties share the next-lower rank's
+        // neighbours; standard "1 + number of students strictly ahead"). Computed
+        // on read so it is always current without a maintenance job.
+        private async Task<int> ComputeRankAsync(int totalPoints)
+            => await _dbContext.Students.CountAsync(s => s.TotalPoints > totalPoints) + 1;
 
         public async Task<IEnumerable<StudentResponseDTO>> GetStudentsService()
         {
@@ -235,6 +243,7 @@ namespace MIO.Infrastructure.Services
             NationalId = student.NationalId,
             ProblemSolved = student.ProblemSolved,
             Score = student.Score,
+            TotalPoints = student.TotalPoints,   // Req 6 (Rank set by the caller)
             JoinYear = student.JoinYear,
             IsAccepted = student.IsAccepted,
             BasicUser = student.User == null ? null! : new BasicUserDTO
@@ -251,7 +260,9 @@ namespace MIO.Infrastructure.Services
         public async Task<StudentResponseDTO?> GetMyStudentService()
         {
             var student = await GetOrCreateCurrentStudent();
-            return MapToResponse(student);
+            var dto = MapToResponse(student);
+            dto.Rank = await ComputeRankAsync(student.TotalPoints);  // Req 7
+            return dto;
         }
 
         public async Task<Student?> UpdateMyStudentService(UpdateStudentDTO studentDTO)

@@ -5,7 +5,7 @@ namespace MIO.Core.DTOs.ProblemDTOs;
 // Instructor grades a student's submission.
 public class GradeSubmissionDto
 {
-    [Range(0, 100)]
+    [Range(0, 1000)]
     public int Grade { get; set; }
 
     [MaxLength(2000)]

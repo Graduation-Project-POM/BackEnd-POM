@@ -16,4 +16,7 @@ public class ProblemResponseDTO
 
     public string? PublisherName { get; set; }
     public bool CanModify { get; set; }
+
+    public int Points { get; set; }
+    public int SolvedCount { get; set; }
 }
