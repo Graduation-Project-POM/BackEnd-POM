@@ -27,6 +27,10 @@ public class CreateProblemDto
     
     public int TrainerID { get; set; }
 
+    [Range(1, 1000, ErrorMessage = "Points must be between 1 and 1000.")]
+    public int Points { get; set; } = 100;
+
+    public bool IsBankVisible { get; set; } = true;
     [Required(ErrorMessage = "IsPublished is required. Choose Draft (false) or Publish (true).")]
     public bool? IsPublished { get; set; }
 

@@ -134,6 +134,9 @@ namespace MIO.Migrations
                     b.Property<int>("Score")
                         .HasColumnType("int");
 
+                    b.Property<int>("TotalPoints")
+                        .HasColumnType("int");
+
                     b.Property<int>("UserId")
                         .HasColumnType("int");
 
@@ -499,6 +502,7 @@ namespace MIO.Migrations
                     b.Property<int>("Difficulty")
                         .HasColumnType("int");
 
+                    b.Property<bool>("IsBankVisible")
                     b.Property<string>("Examples")
                         .HasColumnType("nvarchar(max)");
 
@@ -511,6 +515,12 @@ namespace MIO.Migrations
                     b.Property<string>("PhotoFileKey")
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
+
+                    b.Property<int>("Points")
+                        .HasColumnType("int");
+
+                    b.Property<int>("SolvedCount")
+                        .HasColumnType("int");
 
                     b.Property<string>("Statement")
                         .IsRequired()

@@ -235,7 +235,9 @@ public class ContestService:IContestService
                 Difficulty = p.Difficulty,
                 Topic = p.Topic,
                 PhotoUrl = p.PhotoFileKey,
-                IsPublished = p.IsPublished
+                IsPublished = p.IsPublished,
+                Points = p.Points,
+                SolvedCount = p.SolvedCount
             })
             .ToListAsync();
     }
@@ -265,7 +267,7 @@ public class ContestService:IContestService
         var problems = await _dbContext.Contests
             .Where(c => c.Id == contestId)
             .SelectMany(c => c.Problems)
-            .Select(p => new { p.ID, p.Title, p.Statement, p.Difficulty, p.Topic, p.PhotoFileKey })
+            .Select(p => new { p.ID, p.Title, p.Statement, p.Difficulty, p.Topic, p.PhotoFileKey, p.Points, p.SolvedCount })
             .ToListAsync();
 
         var problemIds = problems.Select(p => p.ID).ToList();
@@ -293,6 +295,8 @@ public class ContestService:IContestService
                 Score = s?.Score,
                 Feedback = s?.Feedback,
                 GradedAt = s?.GradedAt,
+                Points = p.Points,
+                SolvedCount = p.SolvedCount,
             };
         }).ToList();
     }

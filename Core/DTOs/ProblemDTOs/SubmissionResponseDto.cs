@@ -21,4 +21,6 @@ public class SubmissionResponseDto
     public string? ProblemTopic { get; set; }
     public string? ProblemStatement { get; set; }
     public Difficulty ProblemDifficulty { get; set; }
+
+    public int ProblemPoints { get; set; }
 }
