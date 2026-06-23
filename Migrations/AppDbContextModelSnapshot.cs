@@ -416,6 +416,9 @@ namespace MIO.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
+                    b.Property<bool>("IsPublished")
+                        .HasColumnType("bit");
+
                     b.Property<int>("ProblemId")
                         .HasColumnType("int");
 
@@ -453,6 +456,9 @@ namespace MIO.Migrations
 
                     b.Property<DateTime?>("GradedAt")
                         .HasColumnType("datetime2");
+
+                    b.Property<bool>("IsPublished")
+                        .HasColumnType("bit");
 
                     b.Property<int>("ProblemId")
                         .HasColumnType("int");

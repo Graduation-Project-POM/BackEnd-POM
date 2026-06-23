@@ -17,6 +17,8 @@ public class SubmissionResponseDto
     public DateTime SubmittedAt { get; set; }
     public bool IsMine { get; set; }
 
+    public bool IsPublished { get; set; } = true;
+
     public string? ProblemTitle { get; set; }
     public string? ProblemTopic { get; set; }
     public string? ProblemStatement { get; set; }

@@ -23,4 +23,11 @@ public interface IProblemServices
     Task<MyProblemSolutionsDto?> GetMyProblemSolutions(int problemId);
 
     Task<MyProblemSolutionsDto?> GetAllProblemSolutions(int problemId);
+
+    Task<MyProblemSolutionsDto?> GetMyDraftsForProblem(int problemId);
+
+    Task DeleteBankSubmission(int submissionId);
+    Task SetBankSubmissionVisibility(int submissionId, bool isPublished);
+    Task DeleteContestSubmission(int submissionId);
+    Task SetContestSubmissionVisibility(int submissionId, bool isPublished);
 }

@@ -16,4 +16,6 @@ public class ProblemBankSubmission
     public string? SolutionPhotoKey { get; set; }
 
     public DateTime SubmittedAt { get; set; } = DateTime.UtcNow;
+
+    public bool IsPublished { get; set; } = true;
 }

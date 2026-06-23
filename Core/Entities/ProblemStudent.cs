@@ -20,4 +20,6 @@ public class ProblemStudent
     public int? Score { get; set; }
     public string? Feedback { get; set; }
     public DateTime? GradedAt { get; set; }
+
+    public bool IsPublished { get; set; } = true;
 }

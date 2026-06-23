@@ -332,6 +332,7 @@ public class ProblemService : IProblemServices
 
         return await _context.ProblemStudents
             .Where(ps => ps.ProblemId == problemId)
+            .Where(ps => ps.IsPublished)
             .Include(ps => ps.Student).ThenInclude(s => s.User)
             .OrderByDescending(ps => ps.SubmittedAt)
             .Select(ps => new SubmissionResponseDto
@@ -346,7 +347,8 @@ public class ProblemService : IProblemServices
                 Grade = ps.Score,
                 Feedback = ps.Feedback,
                 GradedAt = ps.GradedAt,
-                SubmittedAt = ps.SubmittedAt
+                SubmittedAt = ps.SubmittedAt,
+                IsPublished = ps.IsPublished
             })
             .ToListAsync();
     }
@@ -474,8 +476,23 @@ public class ProblemService : IProblemServices
         if (problem == null || !problem.IsBankProblem)
             throw new AppException($"Problem with ID {problemId} not found", StatusCodes.Status404NotFound);
 
-        return await _context.ProblemBankSubmissions
+        // Drafts are owner-only — never surfaced in a community list, regardless
+        // of the caller's role. Owners read their own drafts through the
+        // dedicated /{id}/my-drafts and /{id}/bank/my-submissions endpoints.
+        var role = _currentUser.Role;
+        var isStudent = role == "Student";
+        var myStudentId = isStudent
+            ? (await _context.Students
+                .Where(s => s.UserId == _currentUser.UserId)
+                .Select(s => (int?)s.Id)
+                .FirstOrDefaultAsync())
+            : null;
+
+        var query = _context.ProblemBankSubmissions
             .Where(s => s.ProblemId == problemId)
+            .Where(s => s.IsPublished);
+
+        return await query
             .Include(s => s.Student).ThenInclude(st => st.User)
             .OrderByDescending(s => s.SubmittedAt)
             .Select(s => new BankSubmissionResponseDto
@@ -487,7 +504,9 @@ public class ProblemService : IProblemServices
                 StudentEmail = s.Student.User.Email,
                 SolutionText = s.SolutionText,
                 PhotoUrl = s.SolutionPhotoKey,
-                SubmittedAt = s.SubmittedAt
+                SubmittedAt = s.SubmittedAt,
+                IsPublished = s.IsPublished,
+                IsMine = myStudentId != null && s.StudentId == myStudentId.Value
             })
             .ToListAsync();
     }
@@ -656,15 +675,23 @@ public class ProblemService : IProblemServices
             .FirstOrDefaultAsync();
         if (problem == null) return null;
 
-        var myStudentId = _currentUser.Role == "Student"
+        var isStudent = _currentUser.Role == "Student";
+        var myStudentId = isStudent
             ? (await _context.Students
                 .Where(s => s.UserId == _currentUser.UserId)
                 .Select(s => (int?)s.Id)
                 .FirstOrDefaultAsync())
             : null;
 
-        var bank = await _context.ProblemBankSubmissions
+        // Drafts are owner-only across every role. Both lists below filter
+        // strictly to Published; owners read their own drafts via
+        // /{id}/my-drafts. myStudentId is kept only to set IsMine on the rows
+        // that *do* appear (the owner's own published submissions).
+        var bankQ = _context.ProblemBankSubmissions
             .Where(s => s.ProblemId == problemId)
+            .Where(s => s.IsPublished);
+
+        var bank = await bankQ
             .Include(s => s.Student).ThenInclude(st => st.User)
             .OrderByDescending(s => s.SubmittedAt)
             .Select(s => new BankSubmissionResponseDto
@@ -677,12 +704,16 @@ public class ProblemService : IProblemServices
                 SolutionText = s.SolutionText,
                 PhotoUrl = s.SolutionPhotoKey,
                 SubmittedAt = s.SubmittedAt,
+                IsPublished = s.IsPublished,
                 IsMine = myStudentId != null && s.StudentId == myStudentId.Value
             })
             .ToListAsync();
 
-        var contest = await _context.ProblemStudents
+        var contestQ = _context.ProblemStudents
             .Where(s => s.ProblemId == problemId)
+            .Where(s => s.IsPublished);
+
+        var contest = await contestQ
             .Include(s => s.Student).ThenInclude(st => st.User)
             .OrderByDescending(s => s.SubmittedAt)
             .Select(s => new SubmissionResponseDto
@@ -698,7 +729,77 @@ public class ProblemService : IProblemServices
                 Feedback = s.Feedback,
                 GradedAt = s.GradedAt,
                 SubmittedAt = s.SubmittedAt,
+                IsPublished = s.IsPublished,
                 IsMine = myStudentId != null && s.StudentId == myStudentId.Value
+            })
+            .ToListAsync();
+
+        return new MyProblemSolutionsDto
+        {
+            ProblemId = problem.ID,
+            Title = problem.Title,
+            Statement = problem.Statement,
+            Topic = problem.Topic,
+            Difficulty = problem.Difficulty,
+            BankSubmissions = bank,
+            ContestSubmissions = contest
+        };
+    }
+
+    // Returns the current student's own DRAFT submissions for a problem
+    // (bank + contest). Strict studentId scope — never returns another
+    // student's rows even if the URL is guessed. Trainers/admins shouldn't
+    // call this; the controller gates on the Student role.
+    public async Task<MyProblemSolutionsDto?> GetMyDraftsForProblem(int problemId)
+    {
+        var student = await _context.Students
+            .FirstOrDefaultAsync(s => s.UserId == _currentUser.UserId);
+        if (student == null) return null;
+
+        var problem = await _context.Problems
+            .Where(p => p.ID == problemId)
+            .Select(p => new { p.ID, p.Title, p.Statement, p.Topic, p.Difficulty })
+            .FirstOrDefaultAsync();
+        if (problem == null) return null;
+
+        var bank = await _context.ProblemBankSubmissions
+            .Where(s => s.ProblemId == problemId && s.StudentId == student.Id && !s.IsPublished)
+            .Include(s => s.Student).ThenInclude(st => st.User)
+            .OrderByDescending(s => s.SubmittedAt)
+            .Select(s => new BankSubmissionResponseDto
+            {
+                Id = s.Id,
+                ProblemId = s.ProblemId,
+                StudentId = s.StudentId,
+                StudentName = s.Student.User.FirstName + " " + s.Student.User.LastName,
+                StudentEmail = s.Student.User.Email,
+                SolutionText = s.SolutionText,
+                PhotoUrl = s.SolutionPhotoKey,
+                SubmittedAt = s.SubmittedAt,
+                IsPublished = false,
+                IsMine = true
+            })
+            .ToListAsync();
+
+        var contest = await _context.ProblemStudents
+            .Where(s => s.ProblemId == problemId && s.StudentId == student.Id && !s.IsPublished)
+            .Include(s => s.Student).ThenInclude(st => st.User)
+            .OrderByDescending(s => s.SubmittedAt)
+            .Select(s => new SubmissionResponseDto
+            {
+                Id = s.Id,
+                ProblemId = s.ProblemId,
+                StudentId = s.StudentId,
+                StudentName = s.Student.User.FirstName + " " + s.Student.User.LastName,
+                StudentEmail = s.Student.User.Email,
+                SolutionText = s.SubmittedSolutionText,
+                PhotoUrl = s.SubmittedSolutionPhotoKey,
+                Grade = s.Score,
+                Feedback = s.Feedback,
+                GradedAt = s.GradedAt,
+                SubmittedAt = s.SubmittedAt,
+                IsPublished = false,
+                IsMine = true
             })
             .ToListAsync();
 
@@ -736,5 +837,75 @@ public class ProblemService : IProblemServices
                 SubmittedAt = s.SubmittedAt
             })
             .ToListAsync();
+    }
+
+    // ── Submission management (delete + visibility toggle) ────────────────
+    // All four methods enforce ownership: the StudentId on the row must match
+    // the current student. Trainers/admins are not allowed through these
+    // endpoints; they have separate moderator tooling.
+
+    private async Task<int> CurrentStudentIdOrThrowAsync()
+    {
+        var student = await _context.Students
+            .FirstOrDefaultAsync(s => s.UserId == _currentUser.UserId);
+        if (student == null)
+            throw new AppException("Only students can manage their own submissions", StatusCodes.Status403Forbidden);
+        return student.Id;
+    }
+
+    public async Task DeleteBankSubmission(int submissionId)
+    {
+        var myStudentId = await CurrentStudentIdOrThrowAsync();
+        var submission = await _context.ProblemBankSubmissions
+            .FirstOrDefaultAsync(s => s.Id == submissionId);
+        if (submission == null)
+            throw new AppException($"Submission {submissionId} not found", StatusCodes.Status404NotFound);
+        if (submission.StudentId != myStudentId)
+            throw new AppException("You can only delete your own submissions", StatusCodes.Status403Forbidden);
+
+        _context.ProblemBankSubmissions.Remove(submission);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task SetBankSubmissionVisibility(int submissionId, bool isPublished)
+    {
+        var myStudentId = await CurrentStudentIdOrThrowAsync();
+        var submission = await _context.ProblemBankSubmissions
+            .FirstOrDefaultAsync(s => s.Id == submissionId);
+        if (submission == null)
+            throw new AppException($"Submission {submissionId} not found", StatusCodes.Status404NotFound);
+        if (submission.StudentId != myStudentId)
+            throw new AppException("You can only change your own submissions", StatusCodes.Status403Forbidden);
+
+        submission.IsPublished = isPublished;
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task DeleteContestSubmission(int submissionId)
+    {
+        var myStudentId = await CurrentStudentIdOrThrowAsync();
+        var submission = await _context.ProblemStudents
+            .FirstOrDefaultAsync(s => s.Id == submissionId);
+        if (submission == null)
+            throw new AppException($"Submission {submissionId} not found", StatusCodes.Status404NotFound);
+        if (submission.StudentId != myStudentId)
+            throw new AppException("You can only delete your own submissions", StatusCodes.Status403Forbidden);
+
+        _context.ProblemStudents.Remove(submission);
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task SetContestSubmissionVisibility(int submissionId, bool isPublished)
+    {
+        var myStudentId = await CurrentStudentIdOrThrowAsync();
+        var submission = await _context.ProblemStudents
+            .FirstOrDefaultAsync(s => s.Id == submissionId);
+        if (submission == null)
+            throw new AppException($"Submission {submissionId} not found", StatusCodes.Status404NotFound);
+        if (submission.StudentId != myStudentId)
+            throw new AppException("You can only change your own submissions", StatusCodes.Status403Forbidden);
+
+        submission.IsPublished = isPublished;
+        await _context.SaveChangesAsync();
     }
 }

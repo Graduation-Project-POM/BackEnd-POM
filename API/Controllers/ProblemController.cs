@@ -229,4 +229,52 @@ public class ProblemsController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("{id}/my-drafts")]
+    [Authorize(Roles = "Student")]
+    public async Task<ActionResult<MyProblemSolutionsDto>> GetMyDraftsForProblem(int id)
+    {
+        if (id <= 0)
+            return BadRequest("Invalid ID");
+
+        var result = await _Problemservice.GetMyDraftsForProblem(id);
+        if (result == null) return NotFound();
+        return Ok(result);
+    }
+
+    [HttpDelete("bank-submissions/{submissionId}")]
+    [Authorize(Roles = "Student")]
+    public async Task<ActionResult> DeleteBankSubmission(int submissionId)
+    {
+        if (submissionId <= 0) return BadRequest("Invalid ID");
+        await _Problemservice.DeleteBankSubmission(submissionId);
+        return NoContent();
+    }
+
+    [HttpPatch("bank-submissions/{submissionId}/visibility")]
+    [Authorize(Roles = "Student")]
+    public async Task<ActionResult> SetBankSubmissionVisibility(int submissionId, [FromBody] UpdateSubmissionVisibilityDto dto)
+    {
+        if (submissionId <= 0) return BadRequest("Invalid ID");
+        await _Problemservice.SetBankSubmissionVisibility(submissionId, dto.IsPublished!.Value);
+        return NoContent();
+    }
+
+    [HttpDelete("submissions/{submissionId}")]
+    [Authorize(Roles = "Student")]
+    public async Task<ActionResult> DeleteContestSubmission(int submissionId)
+    {
+        if (submissionId <= 0) return BadRequest("Invalid ID");
+        await _Problemservice.DeleteContestSubmission(submissionId);
+        return NoContent();
+    }
+
+    [HttpPatch("submissions/{submissionId}/visibility")]
+    [Authorize(Roles = "Student")]
+    public async Task<ActionResult> SetContestSubmissionVisibility(int submissionId, [FromBody] UpdateSubmissionVisibilityDto dto)
+    {
+        if (submissionId <= 0) return BadRequest("Invalid ID");
+        await _Problemservice.SetContestSubmissionVisibility(submissionId, dto.IsPublished!.Value);
+        return NoContent();
+    }
+
 }
