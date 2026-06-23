@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using MIO.Core.DTOs.ProblemDTOs;
 using MIO.Core.Enums;
 
 public class CreateProblemDto
@@ -7,6 +8,10 @@ public class CreateProblemDto
     public string Title { get; set; }
 
     public string? Statement { get; set; }
+
+    public string? Constraints { get; set; }
+
+    public List<ProblemExampleDto>? Examples { get; set; }
 
     [Required]
     public Difficulty Difficulty { get; set; }
@@ -22,5 +27,8 @@ public class CreateProblemDto
     
     public int TrainerID { get; set; }
 
-    public bool IsPublished { get; set; }
+    [Required(ErrorMessage = "IsPublished is required. Choose Draft (false) or Publish (true).")]
+    public bool? IsPublished { get; set; }
+
+    public bool IsBankProblem { get; set; } = true;
 }

@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using MIO.Core.DTOs.ProblemDTOs;
 using MIO.Core.Enums;
 
 public class UpdateProblemDto
@@ -8,18 +9,18 @@ public class UpdateProblemDto
 
     public string? Statement { get; set; }
 
-    // No [MaxLength]: Difficulty is an enum; MaxLength only applies to
-    // strings/arrays and throws at validation time otherwise.
+    public string? Constraints { get; set; }
+
+    public List<ProblemExampleDto>? Examples { get; set; }
+
     [Required]
     public Difficulty Difficulty { get; set; }
 
     [Required, MaxLength(255)]
     public string Topic { get; set; }
 
-    // No [Url]: images are stored as relative paths (e.g. "/uploads/x.png"),
-    // which [Url] would reject. Nullable so an empty value clears the image.
     [MaxLength(500)]
     public string? PhotoFileKey { get; set; }
-
-    public bool IsPublished { get; set; }
+    [Required(ErrorMessage = "IsPublished is required. Choose Draft (false) or Publish (true).")]
+    public bool? IsPublished { get; set; }
 }

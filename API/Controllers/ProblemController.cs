@@ -160,4 +160,62 @@ public class ProblemsController : ControllerBase
         return Ok(result);
     }
 
+
+    [HttpPost("{id}/bank-submit")]
+    [Authorize(Roles = "Student")]
+    public async Task<ActionResult> SubmitBankSolution(int id, SubmitSolutionDto dto)
+    {
+        if (id <= 0)
+            return BadRequest("Invalid ID");
+
+        var result = await _Problemservice.SubmitBankSolution(id, dto);
+        return Ok(result);
+    }
+
+    [HttpGet("{id}/bank-submissions")]
+    [Authorize(Roles = "Admin,Trainer,Student")]
+    public async Task<ActionResult<IEnumerable<BankSubmissionResponseDto>>> GetBankSubmissions(int id)
+    {
+        if (id <= 0)
+            return BadRequest("Invalid ID");
+
+        return Ok(await _Problemservice.GetBankSubmissions(id));
+    }
+
+    [HttpGet("bank/my-submissions")]
+    [Authorize(Roles = "Student")]
+    public async Task<ActionResult<IEnumerable<BankSubmissionResponseDto>>> GetMyBankSubmissions()
+    {
+        return Ok(await _Problemservice.GetMyBankSubmissions());
+    }
+
+    [HttpGet("{id}/bank/my-submissions")]
+    [Authorize(Roles = "Student")]
+    public async Task<ActionResult<IEnumerable<BankSubmissionResponseDto>>> GetMyBankSubmissionsForProblem(int id)
+    {
+        if (id <= 0)
+            return BadRequest("Invalid ID");
+
+        return Ok(await _Problemservice.GetMyBankSubmissionsForProblem(id));
+    }
+
+    [HttpGet("my-solutions")]
+    [Authorize(Roles = "Student")]
+    public async Task<ActionResult<IEnumerable<MySolvedProblemSummaryDto>>> GetMySolvedProblems()
+    {
+        return Ok(await _Problemservice.GetMySolvedProblems());
+    }
+
+    [HttpGet("{id}/my-solutions")]
+    [Authorize(Roles = "Student")]
+    public async Task<ActionResult<MyProblemSolutionsDto>> GetMyProblemSolutions(int id)
+    {
+        if (id <= 0)
+            return BadRequest("Invalid ID");
+
+        var result = await _Problemservice.GetMyProblemSolutions(id);
+        if (result == null) return NotFound();
+        return Ok(result);
+    }
+
 }

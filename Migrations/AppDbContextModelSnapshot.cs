@@ -408,6 +408,38 @@ namespace MIO.Migrations
                     b.ToTable("GroupStudents");
                 });
 
+            modelBuilder.Entity("MIO2.Core.Entities.ProblemBankSubmission", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ProblemId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("SolutionPhotoKey")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("SolutionText")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("StudentId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime>("SubmittedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProblemId");
+
+                    b.HasIndex("StudentId");
+
+                    b.ToTable("ProblemBankSubmissions");
+                });
+
             modelBuilder.Entity("MIO2.Core.Entities.ProblemStudent", b =>
                 {
                     b.Property<int>("Id")
@@ -458,11 +490,20 @@ namespace MIO.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("ID"));
 
+                    b.Property<string>("Constraints")
+                        .HasColumnType("nvarchar(max)");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
                     b.Property<int>("Difficulty")
                         .HasColumnType("int");
+
+                    b.Property<string>("Examples")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<bool>("IsBankProblem")
+                        .HasColumnType("bit");
 
                     b.Property<bool>("IsPublished")
                         .HasColumnType("bit");
@@ -618,6 +659,25 @@ namespace MIO.Migrations
                         .IsRequired();
 
                     b.Navigation("Group");
+
+                    b.Navigation("Student");
+                });
+
+            modelBuilder.Entity("MIO2.Core.Entities.ProblemBankSubmission", b =>
+                {
+                    b.HasOne("Problem", "Problem")
+                        .WithMany()
+                        .HasForeignKey("ProblemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MIO.Core.Entities.Student", "Student")
+                        .WithMany()
+                        .HasForeignKey("StudentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Problem");
 
                     b.Navigation("Student");
                 });

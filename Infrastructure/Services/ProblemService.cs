@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MIO.API.Settings;
@@ -28,6 +29,19 @@ public class ProblemService : IProblemServices
         _currentUser = currentUser;
     }
 
+    private static List<ProblemExampleDto>? DeserializeExamples(string? json)
+    {
+        if (string.IsNullOrWhiteSpace(json)) return null;
+        try { return JsonSerializer.Deserialize<List<ProblemExampleDto>>(json); }
+        catch { return null; }
+    }
+
+    private static string? SerializeExamples(List<ProblemExampleDto>? examples)
+    {
+        if (examples == null || examples.Count == 0) return null;
+        return JsonSerializer.Serialize(examples);
+    }
+
     public async Task<IEnumerable<ProblemResponseDTO>> GetAll()
     {
        
@@ -43,7 +57,7 @@ public class ProblemService : IProblemServices
             myTrainerId = trainer?.Id;
         }
 
-        var query = _context.Problems.AsQueryable();
+        var query = _context.Problems.Where(p => p.IsBankProblem);
 
         if (role == "Student")
         {
@@ -54,21 +68,35 @@ public class ProblemService : IProblemServices
             query = query.Where(p => p.IsPublished || (myTrainerId != null && p.TrainerID == myTrainerId));
         }
 
-        return await query.Select(p => new ProblemResponseDTO
+        var rows = await query.Select(p => new
         {
-            ID = p.ID,
-            Title = p.Title,
-            Statement = p.Statement,
-            Difficulty = p.Difficulty,
-            // Relative path (e.g. "/uploads/x.png"); the client resolves it
-            // against the API host. Null when the problem has no image.
+            p.ID,
+            p.Title,
+            p.Statement,
+            p.Constraints,
+            ExamplesJson = p.Examples,
+            p.Difficulty,
             PhotoUrl = string.IsNullOrEmpty(p.PhotoFileKey) ? null : p.PhotoFileKey,
-            Topic = p.Topic,
-            IsPublished = p.IsPublished,
+            p.Topic,
+            p.IsPublished,
             PublisherName = p.Trainer != null ? p.Trainer.User.FirstName + " " + p.Trainer.User.LastName : null,
             CanModify = isAdmin || (myTrainerId != null && p.TrainerID == myTrainerId)
+        }).ToListAsync();
 
-        })   .ToListAsync();;
+        return rows.Select(r => new ProblemResponseDTO
+        {
+            ID = r.ID,
+            Title = r.Title,
+            Statement = r.Statement,
+            Constraints = r.Constraints,
+            Examples = DeserializeExamples(r.ExamplesJson),
+            Difficulty = r.Difficulty,
+            PhotoUrl = r.PhotoUrl,
+            Topic = r.Topic,
+            IsPublished = r.IsPublished,
+            PublisherName = r.PublisherName,
+            CanModify = r.CanModify
+        });
     }
 
     public async Task<ProblemResponseDTO> GetById(int id)
@@ -77,8 +105,9 @@ public class ProblemService : IProblemServices
             .Include(x => x.Trainer).ThenInclude(t => t.User)
             .FirstOrDefaultAsync(x => x.ID == id);
 
-        if (p == null)
+        if (p == null || !p.IsBankProblem)
         {
+            // Contest problems are not exposed through the Problem Bank.
             throw new AppException(
                 $"Problem with ID {id} not found",
                 StatusCodes.Status404NotFound);
@@ -112,6 +141,8 @@ public class ProblemService : IProblemServices
             ID = p.ID,
             Title = p.Title,
             Statement = p.Statement,
+            Constraints = p.Constraints,
+            Examples = DeserializeExamples(p.Examples),
             Difficulty = p.Difficulty,
             Topic = p.Topic,
             IsPublished = p.IsPublished,
@@ -155,11 +186,14 @@ public class ProblemService : IProblemServices
         {
             Title = dto.Title,
             Statement = dto.Statement ?? "",
+            Constraints = dto.Constraints,
+            Examples = SerializeExamples(dto.Examples),
             Difficulty = dto.Difficulty,
             Topic = dto.Topic,
             PhotoFileKey = dto.PhotoFileKey,
             TrainerID = trainer?.Id,
-            IsPublished = dto.IsPublished,
+            IsPublished = dto.IsPublished!.Value,
+            IsBankProblem = dto.IsBankProblem,
             CreatedAt = DateTime.UtcNow
         };
 
@@ -173,7 +207,7 @@ public class ProblemService : IProblemServices
     {
         var problem = await _context.Problems.FindAsync(id);
 
-        if (problem == null)
+        if (problem == null || !problem.IsBankProblem)
         {
             throw new AppException(
                 $"Problem with ID {id} not found",
@@ -186,9 +220,11 @@ public class ProblemService : IProblemServices
 
         problem.Title = dto.Title;
         problem.Statement = dto.Statement ?? problem.Statement;
+        problem.Constraints = dto.Constraints;
+        problem.Examples = SerializeExamples(dto.Examples);
         problem.Difficulty = dto.Difficulty;
         problem.Topic = dto.Topic;
-        problem.IsPublished = dto.IsPublished;
+        problem.IsPublished = dto.IsPublished!.Value;
         problem.UpdatedAt = DateTime.UtcNow;
 
         
@@ -201,7 +237,7 @@ public class ProblemService : IProblemServices
     {
         var problem = await _context.Problems.FindAsync(id);
 
-        if (problem == null)
+        if (problem == null || !problem.IsBankProblem)
         {
             throw new AppException(
                 $"Problem with ID {id} not found",
@@ -220,8 +256,6 @@ public class ProblemService : IProblemServices
             }
         }
 
-        // if (!string.IsNullOrEmpty(problem.PhotoFileKey))
-        //     await _s3Service.DeleteMediaAsync(problem.PhotoFileKey);
 
         _context.Problems.Remove(problem);
         await _context.SaveChangesAsync();
@@ -375,6 +409,265 @@ public class ProblemService : IProblemServices
                 ProblemTopic = ps.Problem.Topic,
                 ProblemStatement = ps.Problem.Statement,
                 ProblemDifficulty = ps.Problem.Difficulty
+            })
+            .ToListAsync();
+    }
+
+
+    public async Task<BankSubmissionResponseDto> SubmitBankSolution(int problemId, SubmitSolutionDto dto)
+    {
+        var problem = await _context.Problems.FindAsync(problemId);
+        if (problem == null || !problem.IsBankProblem)
+            throw new AppException($"Problem with ID {problemId} not found", StatusCodes.Status404NotFound);
+
+        var userId = _currentUser.UserId;
+        var student = await _context.Students.FirstOrDefaultAsync(s => s.UserId == userId);
+
+        if (student == null)
+        {
+            var user = await _context.Users.FindAsync(userId);
+            if (user == null || user.RoleID != Role.Student)
+                throw new AppException("Only students can submit solutions", StatusCodes.Status403Forbidden);
+
+            student = new Student
+            {
+                UserId = userId,
+                GradeLevel = "",
+                City = "",
+                SchoolName = "",
+                NationalId = "",
+                IsAccepted = true
+            };
+            _context.Students.Add(student);
+            await _context.SaveChangesAsync();
+        }
+
+        if (string.IsNullOrWhiteSpace(dto.SolutionText) && string.IsNullOrWhiteSpace(dto.PhotoFileKey))
+            throw new AppException("You must provide a solution text or a photo", StatusCodes.Status400BadRequest);
+
+        var submission = new ProblemBankSubmission
+        {
+            ProblemId = problemId,
+            StudentId = student.Id,
+            SolutionText = dto.SolutionText,
+            SolutionPhotoKey = dto.PhotoFileKey,
+            SubmittedAt = DateTime.UtcNow
+        };
+
+        _context.ProblemBankSubmissions.Add(submission);
+        await _context.SaveChangesAsync();
+
+        return new BankSubmissionResponseDto
+        {
+            Id = submission.Id,
+            ProblemId = submission.ProblemId,
+            StudentId = submission.StudentId,
+            SolutionText = submission.SolutionText,
+            PhotoUrl = submission.SolutionPhotoKey,
+            SubmittedAt = submission.SubmittedAt
+        };
+    }
+
+    public async Task<IEnumerable<BankSubmissionResponseDto>> GetBankSubmissions(int problemId)
+    {
+        var problem = await _context.Problems.FirstOrDefaultAsync(p => p.ID == problemId);
+        if (problem == null || !problem.IsBankProblem)
+            throw new AppException($"Problem with ID {problemId} not found", StatusCodes.Status404NotFound);
+
+        return await _context.ProblemBankSubmissions
+            .Where(s => s.ProblemId == problemId)
+            .Include(s => s.Student).ThenInclude(st => st.User)
+            .OrderByDescending(s => s.SubmittedAt)
+            .Select(s => new BankSubmissionResponseDto
+            {
+                Id = s.Id,
+                ProblemId = s.ProblemId,
+                StudentId = s.StudentId,
+                StudentName = s.Student.User.FirstName + " " + s.Student.User.LastName,
+                StudentEmail = s.Student.User.Email,
+                SolutionText = s.SolutionText,
+                PhotoUrl = s.SolutionPhotoKey,
+                SubmittedAt = s.SubmittedAt
+            })
+            .ToListAsync();
+    }
+
+    public async Task<IEnumerable<BankSubmissionResponseDto>> GetMyBankSubmissions()
+    {
+        var student = await _context.Students.FirstOrDefaultAsync(s => s.UserId == _currentUser.UserId);
+        if (student == null)
+            return new List<BankSubmissionResponseDto>();
+
+        return await _context.ProblemBankSubmissions
+            .Where(s => s.StudentId == student.Id)
+            .Include(s => s.Student).ThenInclude(st => st.User)
+            .Include(s => s.Problem)
+            .OrderByDescending(s => s.SubmittedAt)
+            .Select(s => new BankSubmissionResponseDto
+            {
+                Id = s.Id,
+                ProblemId = s.ProblemId,
+                StudentId = s.StudentId,
+                StudentName = s.Student.User.FirstName + " " + s.Student.User.LastName,
+                StudentEmail = s.Student.User.Email,
+                SolutionText = s.SolutionText,
+                PhotoUrl = s.SolutionPhotoKey,
+                SubmittedAt = s.SubmittedAt,
+                ProblemTitle = s.Problem.Title,
+                ProblemTopic = s.Problem.Topic,
+                ProblemStatement = s.Problem.Statement,
+                ProblemDifficulty = s.Problem.Difficulty
+            })
+            .ToListAsync();
+    }
+
+
+    public async Task<IEnumerable<MySolvedProblemSummaryDto>> GetMySolvedProblems()
+    {
+        var student = await _context.Students.FirstOrDefaultAsync(s => s.UserId == _currentUser.UserId);
+        if (student == null) return new List<MySolvedProblemSummaryDto>();
+
+        var bankRows = await _context.ProblemBankSubmissions
+            .Where(s => s.StudentId == student.Id)
+            .GroupBy(s => s.ProblemId)
+            .Select(g => new
+            {
+                ProblemId = g.Key,
+                Latest = g.Max(s => s.SubmittedAt)
+            })
+            .ToListAsync();
+
+        var contestRows = await _context.ProblemStudents
+            .Where(s => s.StudentId == student.Id)
+            .GroupBy(s => s.ProblemId)
+            .Select(g => new
+            {
+                ProblemId = g.Key,
+                Latest = g.Max(s => s.SubmittedAt),
+                LatestScore = g.OrderByDescending(s => s.SubmittedAt).Select(s => s.Score).FirstOrDefault()
+            })
+            .ToListAsync();
+
+        var ids = bankRows.Select(b => b.ProblemId)
+            .Union(contestRows.Select(c => c.ProblemId))
+            .ToList();
+        if (ids.Count == 0) return new List<MySolvedProblemSummaryDto>();
+
+        var problems = await _context.Problems
+            .Where(p => ids.Contains(p.ID))
+            .Select(p => new { p.ID, p.Title, p.Topic, p.Difficulty })
+            .ToListAsync();
+
+        var bankMap = bankRows.ToDictionary(b => b.ProblemId);
+        var contestMap = contestRows.ToDictionary(c => c.ProblemId);
+
+        return problems
+            .Select(p =>
+            {
+                bankMap.TryGetValue(p.ID, out var b);
+                contestMap.TryGetValue(p.ID, out var c);
+                DateTime latest;
+                if (b != null && c != null) latest = b.Latest > c.Latest ? b.Latest : c.Latest;
+                else if (b != null) latest = b.Latest;
+                else latest = c!.Latest;
+                return new MySolvedProblemSummaryDto
+                {
+                    ProblemId = p.ID,
+                    Title = p.Title,
+                    Topic = p.Topic,
+                    Difficulty = p.Difficulty,
+                    HasBankSubmission = b != null,
+                    HasContestSubmission = c != null,
+                    LatestContestScore = c?.LatestScore,
+                    LatestSubmittedAt = latest
+                };
+            })
+            .OrderByDescending(s => s.LatestSubmittedAt)
+            .ToList();
+    }
+
+    public async Task<MyProblemSolutionsDto?> GetMyProblemSolutions(int problemId)
+    {
+        var student = await _context.Students.FirstOrDefaultAsync(s => s.UserId == _currentUser.UserId);
+        if (student == null) return null;
+
+        var problem = await _context.Problems
+            .Where(p => p.ID == problemId)
+            .Select(p => new { p.ID, p.Title, p.Statement, p.Topic, p.Difficulty })
+            .FirstOrDefaultAsync();
+        if (problem == null) return null;
+
+        var bank = await _context.ProblemBankSubmissions
+            .Where(s => s.StudentId == student.Id && s.ProblemId == problemId)
+            .Include(s => s.Student).ThenInclude(st => st.User)
+            .OrderByDescending(s => s.SubmittedAt)
+            .Select(s => new BankSubmissionResponseDto
+            {
+                Id = s.Id,
+                ProblemId = s.ProblemId,
+                StudentId = s.StudentId,
+                StudentName = s.Student.User.FirstName + " " + s.Student.User.LastName,
+                StudentEmail = s.Student.User.Email,
+                SolutionText = s.SolutionText,
+                PhotoUrl = s.SolutionPhotoKey,
+                SubmittedAt = s.SubmittedAt
+            })
+            .ToListAsync();
+
+        var contest = await _context.ProblemStudents
+            .Where(s => s.StudentId == student.Id && s.ProblemId == problemId)
+            .Include(s => s.Student).ThenInclude(st => st.User)
+            .OrderByDescending(s => s.SubmittedAt)
+            .Select(s => new SubmissionResponseDto
+            {
+                Id = s.Id,
+                ProblemId = s.ProblemId,
+                StudentId = s.StudentId,
+                StudentName = s.Student.User.FirstName + " " + s.Student.User.LastName,
+                StudentEmail = s.Student.User.Email,
+                SolutionText = s.SubmittedSolutionText,
+                PhotoUrl = s.SubmittedSolutionPhotoKey,
+                Grade = s.Score,
+                Feedback = s.Feedback,
+                GradedAt = s.GradedAt,
+                SubmittedAt = s.SubmittedAt
+            })
+            .ToListAsync();
+
+        if (bank.Count == 0 && contest.Count == 0) return null;
+
+        return new MyProblemSolutionsDto
+        {
+            ProblemId = problem.ID,
+            Title = problem.Title,
+            Statement = problem.Statement,
+            Topic = problem.Topic,
+            Difficulty = problem.Difficulty,
+            BankSubmissions = bank,
+            ContestSubmissions = contest
+        };
+    }
+
+    public async Task<IEnumerable<BankSubmissionResponseDto>> GetMyBankSubmissionsForProblem(int problemId)
+    {
+        var student = await _context.Students.FirstOrDefaultAsync(s => s.UserId == _currentUser.UserId);
+        if (student == null)
+            return new List<BankSubmissionResponseDto>();
+
+        return await _context.ProblemBankSubmissions
+            .Where(s => s.StudentId == student.Id && s.ProblemId == problemId)
+            .Include(s => s.Student).ThenInclude(st => st.User)
+            .OrderByDescending(s => s.SubmittedAt)
+            .Select(s => new BankSubmissionResponseDto
+            {
+                Id = s.Id,
+                ProblemId = s.ProblemId,
+                StudentId = s.StudentId,
+                StudentName = s.Student.User.FirstName + " " + s.Student.User.LastName,
+                StudentEmail = s.Student.User.Email,
+                SolutionText = s.SolutionText,
+                PhotoUrl = s.SolutionPhotoKey,
+                SubmittedAt = s.SubmittedAt
             })
             .ToListAsync();
     }

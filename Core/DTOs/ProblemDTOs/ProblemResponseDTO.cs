@@ -7,6 +7,8 @@ public class ProblemResponseDTO
     public int ID { get; set; }
     public string Title { get; set; }
     public string Statement { get; set; }
+    public string? Constraints { get; set; }
+    public List<ProblemExampleDto>? Examples { get; set; }
     public Difficulty Difficulty { get; set; }
     public string Topic { get; set; }
     public string? PhotoUrl { get; set; }
