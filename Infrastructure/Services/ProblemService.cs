@@ -57,8 +57,7 @@ public class ProblemService : IProblemServices
             myTrainerId = trainer?.Id;
         }
 
-        var query = _context.Problems.Where(p => p.IsBankVisible);
-        var query = _context.Problems.Where(p => p.IsBankProblem);
+        var query = _context.Problems.Where(p => p.IsBankProblem && p.IsBankVisible);
 
         if (role == "Student")
         {
@@ -84,7 +83,6 @@ public class ProblemService : IProblemServices
             CanModify = isAdmin || (myTrainerId != null && p.TrainerID == myTrainerId),
             Points = p.Points,
             SolvedCount = p.SolvedCount
-            CanModify = isAdmin || (myTrainerId != null && p.TrainerID == myTrainerId)
         }).ToListAsync();
 
         return rows.Select(r => new ProblemResponseDTO
@@ -99,7 +97,9 @@ public class ProblemService : IProblemServices
             Topic = r.Topic,
             IsPublished = r.IsPublished,
             PublisherName = r.PublisherName,
-            CanModify = r.CanModify
+            CanModify = r.CanModify,
+            Points = r.Points,
+            SolvedCount = r.SolvedCount
         });
     }
 
@@ -207,9 +207,8 @@ public class ProblemService : IProblemServices
             Topic = dto.Topic,
             PhotoFileKey = dto.PhotoFileKey,
             TrainerID = trainer?.Id,
-            IsPublished = dto.IsPublished,
-            Points = dto.Points,                
-            IsBankVisible = dto.IsBankVisible,    
+            Points = dto.Points,
+            IsBankVisible = dto.IsBankVisible,
             IsPublished = dto.IsPublished!.Value,
             IsBankProblem = dto.IsBankProblem,
             CreatedAt = DateTime.UtcNow
@@ -242,8 +241,7 @@ public class ProblemService : IProblemServices
         problem.Examples = SerializeExamples(dto.Examples);
         problem.Difficulty = dto.Difficulty;
         problem.Topic = dto.Topic;
-        problem.IsPublished = dto.IsPublished;
-        problem.Points = dto.Points;           
+        problem.Points = dto.Points;
         problem.IsPublished = dto.IsPublished!.Value;
         problem.UpdatedAt = DateTime.UtcNow;
 
