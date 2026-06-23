@@ -12,6 +12,8 @@ namespace MIO.Core.Entities
         public string NationalId { get; set; }
         public int ProblemSolved { get; set; } = 0;
         public int Score { get; set; } = 0;
+
+        public int TotalPoints { get; set; } = 0;
         public DateOnly JoinYear { get; set; }= DateOnly.FromDateTime(DateTime.Now);
         public bool IsAccepted { get; set; }= false;
 

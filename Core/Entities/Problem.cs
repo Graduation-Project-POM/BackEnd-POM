@@ -30,7 +30,13 @@ public class Problem
 
     public bool IsPublished { get; set; }
 
-   
+
+    public int Points { get; set; } = 100;
+
+    public int SolvedCount { get; set; }
+
+    public bool IsBankVisible { get; set; } = true;
+ 
     public int? TrainerID { get; set; }
 
     [ForeignKey(nameof(TrainerID))]

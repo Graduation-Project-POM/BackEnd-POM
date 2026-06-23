@@ -43,7 +43,7 @@ public class ProblemService : IProblemServices
             myTrainerId = trainer?.Id;
         }
 
-        var query = _context.Problems.AsQueryable();
+        var query = _context.Problems.Where(p => p.IsBankVisible);
 
         if (role == "Student")
         {
@@ -66,7 +66,9 @@ public class ProblemService : IProblemServices
             Topic = p.Topic,
             IsPublished = p.IsPublished,
             PublisherName = p.Trainer != null ? p.Trainer.User.FirstName + " " + p.Trainer.User.LastName : null,
-            CanModify = isAdmin || (myTrainerId != null && p.TrainerID == myTrainerId)
+            CanModify = isAdmin || (myTrainerId != null && p.TrainerID == myTrainerId),
+            Points = p.Points,
+            SolvedCount = p.SolvedCount
 
         })   .ToListAsync();;
     }
@@ -107,6 +109,15 @@ public class ProblemService : IProblemServices
                 StatusCodes.Status404NotFound);
         }
 
+        if (!p.IsBankVisible)
+        {
+            var ownsProblem = myTrainerId != null && p.TrainerID == myTrainerId;
+            if (!isAdmin && !ownsProblem)
+                throw new AppException(
+                    $"Problem with ID {id} not found",
+                    StatusCodes.Status404NotFound);
+        }
+
         return new ProblemResponseDTO
         {
             ID = p.ID,
@@ -117,7 +128,9 @@ public class ProblemService : IProblemServices
             IsPublished = p.IsPublished,
             PublisherName = p.Trainer != null ? p.Trainer.User.FirstName + " " + p.Trainer.User.LastName : null,
             CanModify = isAdmin || (myTrainerId != null && p.TrainerID == myTrainerId),
-            PhotoUrl = string.IsNullOrEmpty(p.PhotoFileKey) ? null : p.PhotoFileKey
+            PhotoUrl = string.IsNullOrEmpty(p.PhotoFileKey) ? null : p.PhotoFileKey,
+            Points = p.Points,
+            SolvedCount = p.SolvedCount
         };
     }
 
@@ -160,6 +173,8 @@ public class ProblemService : IProblemServices
             PhotoFileKey = dto.PhotoFileKey,
             TrainerID = trainer?.Id,
             IsPublished = dto.IsPublished,
+            Points = dto.Points,                
+            IsBankVisible = dto.IsBankVisible,    
             CreatedAt = DateTime.UtcNow
         };
 
@@ -189,10 +204,13 @@ public class ProblemService : IProblemServices
         problem.Difficulty = dto.Difficulty;
         problem.Topic = dto.Topic;
         problem.IsPublished = dto.IsPublished;
+        problem.Points = dto.Points;           
         problem.UpdatedAt = DateTime.UtcNow;
 
-        
-        
+        await _context.SaveChangesAsync();
+
+        problem.SolvedCount = await _context.ProblemStudents
+            .CountAsync(ps => ps.ProblemId == problem.ID && ps.Score == problem.Points);
         await _context.SaveChangesAsync();
         return true;
     }
@@ -292,9 +310,11 @@ public class ProblemService : IProblemServices
 
     public async Task<IEnumerable<SubmissionResponseDto>> GetSubmissions(int problemId)
     {
-        var exists = await _context.Problems.AnyAsync(p => p.ID == problemId);
-        if (!exists)
+        var problem = await _context.Problems.FindAsync(problemId);
+        if (problem == null)
             throw new AppException($"Problem with ID {problemId} not found", StatusCodes.Status404NotFound);
+
+        await EnsureCanGradeAsync(problem);
 
         return await _context.ProblemStudents
             .Where(ps => ps.ProblemId == problemId)
@@ -312,7 +332,8 @@ public class ProblemService : IProblemServices
                 Grade = ps.Score,
                 Feedback = ps.Feedback,
                 GradedAt = ps.GradedAt,
-                SubmittedAt = ps.SubmittedAt
+                SubmittedAt = ps.SubmittedAt,
+                ProblemPoints = problem.Points
             })
             .ToListAsync();
     }
@@ -321,30 +342,31 @@ public class ProblemService : IProblemServices
     {
         var submission = await _context.ProblemStudents
             .Include(ps => ps.Student).ThenInclude(s => s.User)
+            .Include(ps => ps.Problem)
             .FirstOrDefaultAsync(ps => ps.Id == submissionId);
 
         if (submission == null)
             throw new AppException($"Submission with ID {submissionId} not found", StatusCodes.Status404NotFound);
+
+        var problem = submission.Problem;
+
+        await EnsureCanGradeAsync(problem);
+
+        if (dto.Grade < 0 || dto.Grade > problem.Points)
+            throw new AppException(
+                "GRADE_OUT_OF_RANGE",
+                $"Grade must be between 0 and {problem.Points} for this problem.",
+                StatusCodes.Status400BadRequest);
 
         submission.Score = dto.Grade;
         submission.Feedback = dto.Feedback;
         submission.GradedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
 
-        return new SubmissionResponseDto
-        {
-            Id = submission.Id,
-            ProblemId = submission.ProblemId,
-            StudentId = submission.StudentId,
-            StudentName = submission.Student.User.FirstName + " " + submission.Student.User.LastName,
-            StudentEmail = submission.Student.User.Email,
-            SolutionText = submission.SubmittedSolutionText,
-            PhotoUrl = submission.SubmittedSolutionPhotoKey,
-            Grade = submission.Score,
-            Feedback = submission.Feedback,
-            GradedAt = submission.GradedAt,
-            SubmittedAt = submission.SubmittedAt
-        };
+        await RecomputeAggregatesAsync(problem.ID, submission.StudentId);
+        await _context.SaveChangesAsync();
+
+        return MapSubmission(submission, problem.Points);
     }
 
     public async Task<IEnumerable<SubmissionResponseDto>> GetMySubmissions()
@@ -374,8 +396,78 @@ public class ProblemService : IProblemServices
                 ProblemTitle = ps.Problem.Title,
                 ProblemTopic = ps.Problem.Topic,
                 ProblemStatement = ps.Problem.Statement,
-                ProblemDifficulty = ps.Problem.Difficulty
+                ProblemDifficulty = ps.Problem.Difficulty,
+                ProblemPoints = ps.Problem.Points
             })
             .ToListAsync();
     }
+
+    private async Task EnsureCanGradeAsync(Problem problem)
+    {
+        if (_currentUser.Role == "Admin") return;
+
+        if (_currentUser.Role != "Trainer")
+            throw new AppException("FORBIDDEN", "Only trainers can grade submissions.", StatusCodes.Status403Forbidden);
+
+        var myTrainerId = await _context.Trainers
+            .Where(t => t.UserId == _currentUser.UserId)
+            .Select(t => (int?)t.Id)
+            .FirstOrDefaultAsync();
+
+        if (myTrainerId == null)
+            throw new AppException("FORBIDDEN", "Only trainers can grade submissions.", StatusCodes.Status403Forbidden);
+
+        var owningContest = await _context.Contests
+            .Where(c => c.Problems.Any(p => p.ID == problem.ID))
+            .Select(c => new { c.TrainerId })
+            .FirstOrDefaultAsync();
+
+        var canGrade = owningContest != null
+            ? owningContest.TrainerId == myTrainerId          // contest grading → creator only
+            : problem.TrainerID == myTrainerId;               // bank problem → its creator
+
+        if (!canGrade)
+            throw new AppException(
+                "NOT_CONTEST_OWNER",
+                "Only the trainer who created this contest can grade its submissions.",
+                StatusCodes.Status403Forbidden);
+    }
+
+    private async Task RecomputeAggregatesAsync(int problemId, int studentId)
+    {
+        var problem = await _context.Problems.FindAsync(problemId);
+        if (problem != null)
+        {
+            problem.SolvedCount = await _context.ProblemStudents
+                .CountAsync(ps => ps.ProblemId == problemId && ps.Score == problem.Points);
+        }
+
+        var student = await _context.Students.FindAsync(studentId);
+        if (student != null)
+        {
+
+            student.TotalPoints = await _context.ProblemStudents
+                .Where(ps => ps.StudentId == studentId && ps.Score != null)
+                .SumAsync(ps => (int?)ps.Score) ?? 0;
+
+            student.ProblemSolved = await _context.ProblemStudents
+                .CountAsync(ps => ps.StudentId == studentId && ps.Score == ps.Problem.Points);
+        }
+    }
+
+    private static SubmissionResponseDto MapSubmission(ProblemStudent ps, int problemPoints) => new()
+    {
+        Id = ps.Id,
+        ProblemId = ps.ProblemId,
+        StudentId = ps.StudentId,
+        StudentName = ps.Student.User.FirstName + " " + ps.Student.User.LastName,
+        StudentEmail = ps.Student.User.Email,
+        SolutionText = ps.SubmittedSolutionText,
+        PhotoUrl = ps.SubmittedSolutionPhotoKey,
+        Grade = ps.Score,
+        Feedback = ps.Feedback,
+        GradedAt = ps.GradedAt,
+        SubmittedAt = ps.SubmittedAt,
+        ProblemPoints = problemPoints
+    };
 }

@@ -22,4 +22,7 @@ public class UpdateProblemDto
     public string? PhotoFileKey { get; set; }
 
     public bool IsPublished { get; set; }
+
+    [Range(1, 1000, ErrorMessage = "Points must be between 1 and 1000.")]
+    public int Points { get; set; } = 100;
 }
