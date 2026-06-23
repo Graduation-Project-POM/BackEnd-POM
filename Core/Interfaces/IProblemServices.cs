@@ -21,4 +21,6 @@ public interface IProblemServices
 
     Task<IEnumerable<MySolvedProblemSummaryDto>> GetMySolvedProblems();
     Task<MyProblemSolutionsDto?> GetMyProblemSolutions(int problemId);
+
+    Task<MyProblemSolutionsDto?> GetAllProblemSolutions(int problemId);
 }

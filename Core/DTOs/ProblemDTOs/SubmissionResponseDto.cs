@@ -15,6 +15,7 @@ public class SubmissionResponseDto
     public string? Feedback { get; set; }
     public DateTime? GradedAt { get; set; }
     public DateTime SubmittedAt { get; set; }
+    public bool IsMine { get; set; }
 
     public string? ProblemTitle { get; set; }
     public string? ProblemTopic { get; set; }

@@ -10,5 +10,7 @@ public class MyProblemSolutionsDto
     public string? Statement { get; set; }
     public Difficulty Difficulty { get; set; }
     public string Topic { get; set; } = string.Empty;
+
+    public List<BankSubmissionResponseDto> BankSubmissions { get; set; } = new();
     public List<SubmissionResponseDto> ContestSubmissions { get; set; } = new();
 }

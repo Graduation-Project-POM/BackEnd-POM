@@ -12,6 +12,8 @@ public class BankSubmissionResponseDto
     public string? SolutionText { get; set; }
     public string? PhotoUrl { get; set; }
     public DateTime SubmittedAt { get; set; }
+    public bool IsMine { get; set; }
+
     public string? ProblemTitle { get; set; }
     public string? ProblemTopic { get; set; }
     public string? ProblemStatement { get; set; }

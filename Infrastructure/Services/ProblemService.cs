@@ -648,6 +648,72 @@ public class ProblemService : IProblemServices
         };
     }
 
+    public async Task<MyProblemSolutionsDto?> GetAllProblemSolutions(int problemId)
+    {
+        var problem = await _context.Problems
+            .Where(p => p.ID == problemId)
+            .Select(p => new { p.ID, p.Title, p.Statement, p.Topic, p.Difficulty })
+            .FirstOrDefaultAsync();
+        if (problem == null) return null;
+
+        var myStudentId = _currentUser.Role == "Student"
+            ? (await _context.Students
+                .Where(s => s.UserId == _currentUser.UserId)
+                .Select(s => (int?)s.Id)
+                .FirstOrDefaultAsync())
+            : null;
+
+        var bank = await _context.ProblemBankSubmissions
+            .Where(s => s.ProblemId == problemId)
+            .Include(s => s.Student).ThenInclude(st => st.User)
+            .OrderByDescending(s => s.SubmittedAt)
+            .Select(s => new BankSubmissionResponseDto
+            {
+                Id = s.Id,
+                ProblemId = s.ProblemId,
+                StudentId = s.StudentId,
+                StudentName = s.Student.User.FirstName + " " + s.Student.User.LastName,
+                StudentEmail = s.Student.User.Email,
+                SolutionText = s.SolutionText,
+                PhotoUrl = s.SolutionPhotoKey,
+                SubmittedAt = s.SubmittedAt,
+                IsMine = myStudentId != null && s.StudentId == myStudentId.Value
+            })
+            .ToListAsync();
+
+        var contest = await _context.ProblemStudents
+            .Where(s => s.ProblemId == problemId)
+            .Include(s => s.Student).ThenInclude(st => st.User)
+            .OrderByDescending(s => s.SubmittedAt)
+            .Select(s => new SubmissionResponseDto
+            {
+                Id = s.Id,
+                ProblemId = s.ProblemId,
+                StudentId = s.StudentId,
+                StudentName = s.Student.User.FirstName + " " + s.Student.User.LastName,
+                StudentEmail = s.Student.User.Email,
+                SolutionText = s.SubmittedSolutionText,
+                PhotoUrl = s.SubmittedSolutionPhotoKey,
+                Grade = s.Score,
+                Feedback = s.Feedback,
+                GradedAt = s.GradedAt,
+                SubmittedAt = s.SubmittedAt,
+                IsMine = myStudentId != null && s.StudentId == myStudentId.Value
+            })
+            .ToListAsync();
+
+        return new MyProblemSolutionsDto
+        {
+            ProblemId = problem.ID,
+            Title = problem.Title,
+            Statement = problem.Statement,
+            Topic = problem.Topic,
+            Difficulty = problem.Difficulty,
+            BankSubmissions = bank,
+            ContestSubmissions = contest
+        };
+    }
+
     public async Task<IEnumerable<BankSubmissionResponseDto>> GetMyBankSubmissionsForProblem(int problemId)
     {
         var student = await _context.Students.FirstOrDefaultAsync(s => s.UserId == _currentUser.UserId);
