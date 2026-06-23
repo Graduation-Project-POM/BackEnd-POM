@@ -13,4 +13,14 @@ public interface IProblemServices
     Task<IEnumerable<SubmissionResponseDto>> GetSubmissions(int problemId);
     Task<SubmissionResponseDto> GradeSubmission(int submissionId, GradeSubmissionDto dto);
     Task<IEnumerable<SubmissionResponseDto>> GetMySubmissions();
+
+    Task<BankSubmissionResponseDto> SubmitBankSolution(int problemId, SubmitSolutionDto dto);
+    Task<IEnumerable<BankSubmissionResponseDto>> GetBankSubmissions(int problemId);
+    Task<IEnumerable<BankSubmissionResponseDto>> GetMyBankSubmissions();
+    Task<IEnumerable<BankSubmissionResponseDto>> GetMyBankSubmissionsForProblem(int problemId);
+
+    Task<IEnumerable<MySolvedProblemSummaryDto>> GetMySolvedProblems();
+    Task<MyProblemSolutionsDto?> GetMyProblemSolutions(int problemId);
+
+    Task<MyProblemSolutionsDto?> GetAllProblemSolutions(int problemId);
 }

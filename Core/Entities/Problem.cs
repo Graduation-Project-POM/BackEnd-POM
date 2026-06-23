@@ -15,6 +15,10 @@ public class Problem
 
     public string Statement { get; set; }
 
+
+    public string? Constraints { get; set; }
+    public string? Examples { get; set; }
+
     public Difficulty Difficulty { get; set; }
 
     [MaxLength(255)]
@@ -37,6 +41,9 @@ public class Problem
 
     public bool IsBankVisible { get; set; } = true;
  
+    public bool IsBankProblem { get; set; }
+
+
     public int? TrainerID { get; set; }
 
     [ForeignKey(nameof(TrainerID))]

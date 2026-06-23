@@ -123,7 +123,6 @@ public class ProblemsController : ControllerBase
         });
     }
     
-    //قبل استخدامه بدنا نشوف اذا الطالب بعت صورة بدنا نستخدم UploadMediaRequest بالgallery بعدين الفرونت بده ينزل الصورة على الs3 وبعدين UploadAMediaInDbAfterUploadingInS3
     [HttpPost("{id}/submit")]
     [Authorize(Roles = "Student")]
     public async Task<ActionResult> SubmitSolution(int id, SubmitSolutionDto dto)
@@ -157,6 +156,76 @@ public class ProblemsController : ControllerBase
             return BadRequest("Invalid ID");
 
         var result = await _Problemservice.GradeSubmission(submissionId, dto);
+        return Ok(result);
+    }
+
+
+    [HttpPost("{id}/bank-submit")]
+    [Authorize(Roles = "Student")]
+    public async Task<ActionResult> SubmitBankSolution(int id, SubmitSolutionDto dto)
+    {
+        if (id <= 0)
+            return BadRequest("Invalid ID");
+
+        var result = await _Problemservice.SubmitBankSolution(id, dto);
+        return Ok(result);
+    }
+
+    [HttpGet("{id}/bank-submissions")]
+    [Authorize(Roles = "Admin,Trainer,Student")]
+    public async Task<ActionResult<IEnumerable<BankSubmissionResponseDto>>> GetBankSubmissions(int id)
+    {
+        if (id <= 0)
+            return BadRequest("Invalid ID");
+
+        return Ok(await _Problemservice.GetBankSubmissions(id));
+    }
+
+    [HttpGet("bank/my-submissions")]
+    [Authorize(Roles = "Student")]
+    public async Task<ActionResult<IEnumerable<BankSubmissionResponseDto>>> GetMyBankSubmissions()
+    {
+        return Ok(await _Problemservice.GetMyBankSubmissions());
+    }
+
+    [HttpGet("{id}/bank/my-submissions")]
+    [Authorize(Roles = "Student")]
+    public async Task<ActionResult<IEnumerable<BankSubmissionResponseDto>>> GetMyBankSubmissionsForProblem(int id)
+    {
+        if (id <= 0)
+            return BadRequest("Invalid ID");
+
+        return Ok(await _Problemservice.GetMyBankSubmissionsForProblem(id));
+    }
+
+    [HttpGet("my-solutions")]
+    [Authorize(Roles = "Student")]
+    public async Task<ActionResult<IEnumerable<MySolvedProblemSummaryDto>>> GetMySolvedProblems()
+    {
+        return Ok(await _Problemservice.GetMySolvedProblems());
+    }
+
+    [HttpGet("{id}/my-solutions")]
+    [Authorize(Roles = "Student")]
+    public async Task<ActionResult<MyProblemSolutionsDto>> GetMyProblemSolutions(int id)
+    {
+        if (id <= 0)
+            return BadRequest("Invalid ID");
+
+        var result = await _Problemservice.GetMyProblemSolutions(id);
+        if (result == null) return NotFound();
+        return Ok(result);
+    }
+
+    [HttpGet("{id}/all-solutions")]
+    [Authorize(Roles = "Admin,Trainer,Student")]
+    public async Task<ActionResult<MyProblemSolutionsDto>> GetAllProblemSolutions(int id)
+    {
+        if (id <= 0)
+            return BadRequest("Invalid ID");
+
+        var result = await _Problemservice.GetAllProblemSolutions(id);
+        if (result == null) return NotFound();
         return Ok(result);
     }
 
