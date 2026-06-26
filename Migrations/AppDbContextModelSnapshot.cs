@@ -508,11 +508,13 @@ namespace MIO.Migrations
                     b.Property<int>("Difficulty")
                         .HasColumnType("int");
 
-                    b.Property<bool>("IsBankVisible")
                     b.Property<string>("Examples")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<bool>("IsBankProblem")
+                        .HasColumnType("bit");
+
+                    b.Property<bool>("IsBankVisible")
                         .HasColumnType("bit");
 
                     b.Property<bool>("IsPublished")
