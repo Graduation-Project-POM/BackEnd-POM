@@ -97,7 +97,9 @@ public class ProblemService : IProblemServices
             Topic = r.Topic,
             IsPublished = r.IsPublished,
             PublisherName = r.PublisherName,
-            CanModify = r.CanModify
+            CanModify = r.CanModify,
+            Points = r.Points,
+            SolvedCount = r.SolvedCount
         });
     }
 
