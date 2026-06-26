@@ -82,6 +82,13 @@ public ContestController(IContestService contestService)
         return Ok(problems);
     }
     
+    [HttpGet("{contestId}/leaderboard")]
+    public async Task<ActionResult<List<ContestLeaderboardEntryDTO>>> GetContestLeaderboard(int contestId)
+    {
+        var leaderboard = await _contestService.GetContestLeaderboard(contestId);
+        return Ok(leaderboard);
+    }
+
     [HttpPut("{contestId}")]
     [Authorize(Policy = "ContestOwnerOrAdmin")]
     public async Task<IActionResult> UpdateContest(int contestId, UpdateContestDTO dto)

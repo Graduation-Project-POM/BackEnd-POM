@@ -109,9 +109,8 @@ public class ProblemService : IProblemServices
             .Include(x => x.Trainer).ThenInclude(t => t.User)
             .FirstOrDefaultAsync(x => x.ID == id);
 
-        if (p == null || !p.IsBankProblem)
+        if (p == null)
         {
-            // Contest problems are not exposed through the Problem Bank.
             throw new AppException(
                 $"Problem with ID {id} not found",
                 StatusCodes.Status404NotFound);
@@ -124,6 +123,19 @@ public class ProblemService : IProblemServices
         {
             myTrainerId = (await _context.Trainers
                 .FirstOrDefaultAsync(t => t.UserId == _currentUser.UserId))?.Id;
+        }
+
+        // Contest-only problems are not exposed through the Problem Bank lookup
+        // for students — they have separate per-contest endpoints. Admin and the
+        // contest's owning trainer can still fetch the record (needed for the
+        // contest's Edit Problem flow).
+        if (!p.IsBankProblem)
+        {
+            var owns = myTrainerId != null && p.TrainerID == myTrainerId;
+            if (!isAdmin && !owns)
+                throw new AppException(
+                    $"Problem with ID {id} not found",
+                    StatusCodes.Status404NotFound);
         }
 
         if (role == "Student" && !p.IsPublished)
@@ -224,11 +236,23 @@ public class ProblemService : IProblemServices
     {
         var problem = await _context.Problems.FindAsync(id);
 
-        if (problem == null || !problem.IsBankProblem)
+        if (problem == null)
         {
             throw new AppException(
                 $"Problem with ID {id} not found",
                 StatusCodes.Status404NotFound);
+        }
+
+        if (_currentUser.Role == "Trainer")
+        {
+            var trainer = await _context.Trainers
+                .FirstOrDefaultAsync(t => t.UserId == _currentUser.UserId);
+            if (trainer == null || problem.TrainerID != trainer.Id)
+            {
+                throw new AppException(
+                    "You can only edit problems you created",
+                    StatusCodes.Status403Forbidden);
+            }
         }
 
         problem.PhotoFileKey = string.IsNullOrWhiteSpace(dto.PhotoFileKey)
@@ -247,8 +271,10 @@ public class ProblemService : IProblemServices
 
         await _context.SaveChangesAsync();
 
+        // "Solved" = passing score: Score is at least half of the problem's
+        // Points (integer-safe via Score*2 >= Points).
         problem.SolvedCount = await _context.ProblemStudents
-            .CountAsync(ps => ps.ProblemId == problem.ID && ps.Score == problem.Points);
+            .CountAsync(ps => ps.ProblemId == problem.ID && ps.Score != null && ps.Score * 2 >= problem.Points);
         await _context.SaveChangesAsync();
         return true;
     }
@@ -257,7 +283,7 @@ public class ProblemService : IProblemServices
     {
         var problem = await _context.Problems.FindAsync(id);
 
-        if (problem == null || !problem.IsBankProblem)
+        if (problem == null)
         {
             throw new AppException(
                 $"Problem with ID {id} not found",
@@ -476,8 +502,9 @@ public class ProblemService : IProblemServices
         var problem = await _context.Problems.FindAsync(problemId);
         if (problem != null)
         {
+            // "Solved" = Score is at least half of Points (Score*2 >= Points).
             problem.SolvedCount = await _context.ProblemStudents
-                .CountAsync(ps => ps.ProblemId == problemId && ps.Score == problem.Points);
+                .CountAsync(ps => ps.ProblemId == problemId && ps.Score != null && ps.Score * 2 >= problem.Points);
         }
 
         var student = await _context.Students.FindAsync(studentId);
@@ -489,7 +516,35 @@ public class ProblemService : IProblemServices
                 .SumAsync(ps => (int?)ps.Score) ?? 0;
 
             student.ProblemSolved = await _context.ProblemStudents
-                .CountAsync(ps => ps.StudentId == studentId && ps.Score == ps.Problem.Points);
+                .CountAsync(ps => ps.StudentId == studentId && ps.Score != null && ps.Score * 2 >= ps.Problem.Points);
+        }
+
+        // Per-contest leaderboard score: every contest that contains this problem
+        // and has the student enrolled needs its ContestStudent.Score recomputed
+        // from the student's submissions to that contest's problems.
+        var contestRowsToUpdate = await _context.ContestStudents
+            .Where(cs => cs.StudentId == studentId &&
+                         cs.Contest.Problems.Any(p => p.ID == problemId))
+            .ToListAsync();
+
+        foreach (var cs in contestRowsToUpdate)
+        {
+            var contestProblemIds = await _context.Contests
+                .Where(c => c.Id == cs.ContestId)
+                .SelectMany(c => c.Problems.Select(p => p.ID))
+                .ToListAsync();
+
+            cs.Score = await _context.ProblemStudents
+                .Where(ps => ps.StudentId == studentId &&
+                             contestProblemIds.Contains(ps.ProblemId) &&
+                             ps.Score != null)
+                .SumAsync(ps => (int?)ps.Score) ?? 0;
+
+            cs.ProblemSolved = await _context.ProblemStudents
+                .CountAsync(ps => ps.StudentId == studentId &&
+                                  contestProblemIds.Contains(ps.ProblemId) &&
+                                  ps.Score != null &&
+                                  ps.Score * 2 >= ps.Problem.Points);
         }
     }
 

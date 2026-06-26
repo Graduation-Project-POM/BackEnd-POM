@@ -13,6 +13,7 @@ public interface IContestService
      Task<ContestsStudentsResponseDTO> GetContestsStudents(int contestId);
      Task<List<ProblemResponseDTO>> GetContestProblems(int contestId);
      Task<List<StudentContestProblemDto>> GetContestProblemsForStudent(int contestId);
+     Task<List<ContestLeaderboardEntryDTO>> GetContestLeaderboard(int contestId);
      Task<ContestDTO> UpdateContest(int contestId, UpdateContestDTO dto);
      Task DeleteContest(int contestId);
 }

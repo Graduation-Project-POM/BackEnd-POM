@@ -81,9 +81,10 @@ public class ContestService:IContestService
 
     public async Task<AddStudentsToContestResponseDTO> AddStudentToContest(int contestId, AddStudentsToContestDTO dto)
     {
-        
+
         var contest = await _dbContext.Contests
             .Include(c => c.ContestStudents)
+            .Include(c => c.Problems)
             .FirstOrDefaultAsync(c => c.Id == contestId);
         if (contest == null)
             throw new AppException($"Contest with ID {contestId} not found", StatusCodes.Status404NotFound);
@@ -98,32 +99,67 @@ public class ContestService:IContestService
         var existingStudentIds = contest.ContestStudents
             .Select(cs => cs.StudentId)
             .ToList();
-        
+
         var newStudentIds = dto.StudentIds
-            .Except(existingStudentIds)  
+            .Except(existingStudentIds)
             .ToList();
-        
+
         var students = await _dbContext.Students
             .Where(s => newStudentIds.Contains(s.Id))
             .ToListAsync();
-        
+
         var missingIds = newStudentIds.Except(students.Select(s => s.Id)).ToList();
-        
-        var contestStudents = students.Select(s => new ContestStudent
+
+        // Seed each new enrollment from existing graded submissions to the
+        // contest's problems, so students who already solved problems in the
+        // contest's question set arrive with the right Score / ProblemSolved
+        // instead of zeros (otherwise the leaderboard understates them until
+        // their next grading event).
+        var contestProblemIds = contest.Problems.Select(p => p.ID).ToList();
+        var studentIdList = students.Select(s => s.Id).ToList();
+
+        var priorSubs = contestProblemIds.Count == 0 || studentIdList.Count == 0
+            ? new List<SeedSubmission>()
+            : await _dbContext.ProblemStudents
+                .Where(ps => studentIdList.Contains(ps.StudentId) && contestProblemIds.Contains(ps.ProblemId))
+                .Select(ps => new SeedSubmission
+                {
+                    StudentId = ps.StudentId,
+                    Score = ps.Score,
+                    Points = ps.Problem.Points
+                })
+                .ToListAsync();
+
+        var subsByStudent = priorSubs
+            .GroupBy(x => x.StudentId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var contestStudents = students.Select(s =>
         {
-            ContestId = contestId,
-            StudentId = s.Id,
-            ProblemSolved = 0,
-            Score = 0,
-            TimeToFinishTheContest = 0
+            int score = 0;
+            int solved = 0;
+            if (subsByStudent.TryGetValue(s.Id, out var rows))
+            {
+                score = rows.Where(r => r.Score != null).Sum(r => r.Score!.Value);
+                // Pass mark: Score must reach at least half of the problem's
+                // points (Score*2 >= Points keeps the comparison integer-safe).
+                solved = rows.Count(r => r.Score != null && r.Score.Value * 2 >= r.Points);
+            }
+            return new ContestStudent
+            {
+                ContestId = contestId,
+                StudentId = s.Id,
+                ProblemSolved = solved,
+                Score = score,
+                TimeToFinishTheContest = 0
+            };
         });
-        
-        
+
         _dbContext.ContestStudents.AddRange(contestStudents);
         await _dbContext.SaveChangesAsync();
-        
-        
-        
+
+
+
         return new AddStudentsToContestResponseDTO
         {
             Message = $"{students.Count} students added successfully",
@@ -301,6 +337,122 @@ public class ContestService:IContestService
         }).ToList();
     }
 
+    public async Task<List<ContestLeaderboardEntryDTO>> GetContestLeaderboard(int contestId)
+    {
+        var contestExists = await _dbContext.Contests.AnyAsync(c => c.Id == contestId);
+        if (!contestExists)
+            throw new AppException($"Contest with ID {contestId} not found", StatusCodes.Status404NotFound);
+
+        var role = _currentUser.Role;
+        var isAdmin = role == "Admin";
+
+        if (!isAdmin)
+        {
+            if (role == "Trainer")
+            {
+                var trainerId = await _dbContext.Trainers
+                    .Where(t => t.UserId == _currentUser.UserId)
+                    .Select(t => (int?)t.Id)
+                    .FirstOrDefaultAsync();
+
+                var canSee = trainerId != null && await _dbContext.GroupContests
+                    .AnyAsync(gc => gc.ContestId == contestId && gc.Group.TrainerId == trainerId);
+                if (!canSee)
+                    throw new AppException("You are not authorized to view this leaderboard", StatusCodes.Status403Forbidden);
+            }
+            else if (role == "Student")
+            {
+                var studentId = await _dbContext.Students
+                    .Where(s => s.UserId == _currentUser.UserId)
+                    .Select(s => (int?)s.Id)
+                    .FirstOrDefaultAsync();
+
+                var enrolled = studentId != null && await _dbContext.GroupContests
+                    .AnyAsync(gc => gc.ContestId == contestId &&
+                                    gc.Group.GroupStudents.Any(gs => gs.StudentId == studentId));
+                if (!enrolled)
+                    throw new AppException("You are not enrolled in a group for this contest", StatusCodes.Status403Forbidden);
+            }
+        }
+
+        // Build the participant pool from two sources so the leaderboard is
+        // never empty just because no one was explicitly added to
+        // ContestStudents: (a) anyone in a group linked to this contest,
+        // (b) anyone explicitly enrolled via ContestStudents.
+        var problemIds = await _dbContext.Contests
+            .Where(c => c.Id == contestId)
+            .SelectMany(c => c.Problems.Select(p => p.ID))
+            .ToListAsync();
+
+        var groupStudentIds = await _dbContext.GroupContests
+            .Where(gc => gc.ContestId == contestId)
+            .SelectMany(gc => gc.Group.GroupStudents.Select(gs => gs.StudentId))
+            .Distinct()
+            .ToListAsync();
+
+        var enrolledStudentIds = await _dbContext.ContestStudents
+            .Where(cs => cs.ContestId == contestId)
+            .Select(cs => cs.StudentId)
+            .ToListAsync();
+
+        var participantIds = groupStudentIds
+            .Concat(enrolledStudentIds)
+            .Distinct()
+            .ToList();
+
+        if (participantIds.Count == 0)
+            return new List<ContestLeaderboardEntryDTO>();
+
+        // Compute each participant's score live from ProblemStudents so the
+        // leaderboard reflects the latest grades without depending on
+        // ContestStudents.Score being kept in sync.
+        var participants = await _dbContext.Students
+            .Where(s => participantIds.Contains(s.Id))
+            .Select(s => new
+            {
+                StudentId = s.Id,
+                FirstName = s.User.FirstName,
+                LastName = s.User.LastName,
+                Score = _dbContext.ProblemStudents
+                    .Where(ps => ps.StudentId == s.Id &&
+                                 problemIds.Contains(ps.ProblemId) &&
+                                 ps.Score != null)
+                    .Sum(ps => (int?)ps.Score) ?? 0
+            })
+            .ToListAsync();
+
+        var rows = participants
+            .OrderByDescending(x => x.Score)
+            .ThenBy(x => x.FirstName)
+            .ThenBy(x => x.LastName)
+            .ToList();
+
+        var leaderboard = new List<ContestLeaderboardEntryDTO>(rows.Count);
+        int rank = 0;
+        int? lastScore = null;
+        int seen = 0;
+        foreach (var r in rows)
+        {
+            seen++;
+            // Standard "1224" ranking: ties share the higher rank.
+            if (lastScore == null || r.Score != lastScore)
+            {
+                rank = seen;
+                lastScore = r.Score;
+            }
+
+            leaderboard.Add(new ContestLeaderboardEntryDTO
+            {
+                Rank = rank,
+                StudentId = r.StudentId,
+                StudentName = $"{r.FirstName} {r.LastName}".Trim(),
+                Score = r.Score
+            });
+        }
+
+        return leaderboard;
+    }
+
     public async Task<ContestDTO> UpdateContest(int contestId, UpdateContestDTO dto)
     {
         var isAdmin = _currentUser.Role == "Admin";
@@ -396,6 +548,13 @@ public class ContestService:IContestService
 
         _dbContext.Contests.Remove(contest);
         await _dbContext.SaveChangesAsync();
+    }
+
+    private sealed class SeedSubmission
+    {
+        public int StudentId { get; set; }
+        public int? Score { get; set; }
+        public int Points { get; set; }
     }
 
     private async Task<bool> CanTrainerManageContestAsync(int contestId, int? contestTrainerId, int? myTrainerId)
