@@ -127,6 +127,18 @@ public class GroupService(AppDbContext db, ICurrentUserService currentUser) : IG
 
         await EnsureCanManageGroupAsync(id);
 
+        // Deleting a group also deletes the contests assigned to it. Removing the
+        // Contest rows cascades to their participants (ContestStudents), their
+        // problem links (ContestProblem) and the GroupContest links, so no
+        // orphaned contest data is left behind. Students' solved history
+        // (ProblemStudents) is keyed to Problem, not Contest, so it is preserved.
+        var contests = await db.Contests
+            .Where(c => db.GroupContests.Any(gc => gc.GroupId == id && gc.ContestId == c.Id))
+            .ToListAsync();
+
+        if (contests.Count > 0)
+            db.Contests.RemoveRange(contests);
+
         db.Groups.Remove(group);
         await db.SaveChangesAsync();
         return true;
