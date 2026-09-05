@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using MIO.API.Settings;
 using MIO.Core.Interfaces;
 using MIO.Infrastructure.Services;
@@ -34,6 +34,7 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IStudentService, StudentServices>();
         services.AddScoped<ICurrentUserService, CurrentUserService>();
         services.AddScoped<IProblemServices, ProblemService>();
+        services.AddScoped<IProblemDiscussionService, ProblemDiscussionService>();
         services.AddScoped<IContestService, ContestService>();
         services.AddScoped<IAuthService, AuthService>();
         services.AddScoped<IGroupService, GroupService>();

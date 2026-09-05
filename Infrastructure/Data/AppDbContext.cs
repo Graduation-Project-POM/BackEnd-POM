@@ -30,7 +30,7 @@ namespace MIO.Infrastructure
         public DbSet<GroupContest> GroupContests { get; set; }
         public DbSet<ProblemStudent> ProblemStudents { get; set; }
         public DbSet<ProblemBankSubmission> ProblemBankSubmissions { get; set; }
-        //راح اضيف الجداول بس لما نتفق عليهم ان شاء الله
+        public DbSet<ProblemComment> ProblemComments { get; set; }
 
     }
 }

@@ -446,6 +446,47 @@ namespace MIO.Migrations
                     b.ToTable("ProblemBankSubmissions");
                 });
 
+            modelBuilder.Entity("MIO2.Core.Entities.ProblemComment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("int");
+
+                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Body")
+                        .HasMaxLength(4000)
+                        .HasColumnType("nvarchar(4000)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int?>("ParentCommentId")
+                        .HasColumnType("int");
+
+                    b.Property<string>("PhotoFileKey")
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<int>("ProblemId")
+                        .HasColumnType("int");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("int");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ParentCommentId");
+
+                    b.HasIndex("UserId");
+
+                    b.HasIndex("ProblemId", "CreatedAt");
+
+                    b.ToTable("ProblemComments");
+                });
+
             modelBuilder.Entity("MIO2.Core.Entities.ProblemStudent", b =>
                 {
                     b.Property<int>("Id")
@@ -700,6 +741,32 @@ namespace MIO.Migrations
                     b.Navigation("Student");
                 });
 
+            modelBuilder.Entity("MIO2.Core.Entities.ProblemComment", b =>
+                {
+                    b.HasOne("MIO2.Core.Entities.ProblemComment", "ParentComment")
+                        .WithMany("Replies")
+                        .HasForeignKey("ParentCommentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
+                    b.HasOne("Problem", "Problem")
+                        .WithMany()
+                        .HasForeignKey("ProblemId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MIO.Core.Entities.User", "User")
+                        .WithMany()
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("ParentComment");
+
+                    b.Navigation("Problem");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("MIO2.Core.Entities.ProblemStudent", b =>
                 {
                     b.HasOne("Problem", "Problem")
@@ -762,6 +829,11 @@ namespace MIO.Migrations
             modelBuilder.Entity("MIO2.Core.Entities.Contest", b =>
                 {
                     b.Navigation("ContestStudents");
+                });
+
+            modelBuilder.Entity("MIO2.Core.Entities.ProblemComment", b =>
+                {
+                    b.Navigation("Replies");
                 });
 
             modelBuilder.Entity("Problem", b =>
