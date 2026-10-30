@@ -27,6 +27,10 @@ public class AuthService :IAuthService
     
     public async Task<AuthResponseDTO> CreateToken(JwtOptions jwtOptions,User user)
     {
+        // Callers verify the password first, so this doesn't reveal which accounts exist.
+        if (!user.IsActive)
+            throw new AppException("ACCOUNT_INACTIVE", "Your account has been deactivated", StatusCodes.Status403Forbidden);
+
         var expires = DateTime.UtcNow.AddMinutes(jwtOptions.lifetime);
 
 
@@ -65,6 +69,10 @@ public class AuthService :IAuthService
     
         if (user == null)
             throw new AppException("Invalid refresh token", StatusCodes.Status401Unauthorized);
+
+        // Deactivated after login: stop renewing their session.
+        if (!user.IsActive)
+            throw new AppException("ACCOUNT_INACTIVE", "Your account has been deactivated", StatusCodes.Status401Unauthorized);
     
         if (user.RefreshTokenRevokedAt != null)
             throw new AppException("Refresh token has been revoked",StatusCodes.Status401Unauthorized);

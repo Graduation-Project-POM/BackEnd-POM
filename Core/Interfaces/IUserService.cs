@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using MIO.API.Authentication;
 using MIO.Core.DTOs;
 using MIO.Core.DTOs.UserDtos;
@@ -22,7 +22,7 @@ namespace MIO.Core.Interfaces
 
         Task<IEnumerable<UserResponseDTO>> GetUsersService();
 
-        Task<User?> UpdateUserService(int id, UpdateUserDTO userDTO);
+        Task<User?> UpdateUserService(int id, AdminUpdateUserDTO userDTO);
 
 
         Task<User?> DeleteUserService(int id);

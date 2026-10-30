@@ -31,6 +31,9 @@ namespace MIO.Core.DTOs.UserDtos
             [Range(1, 10)] 
              public required Role RoleID { get; set; }
 
+             // Admin create only; defaults to active. Ignored by public sign-up.
+             public bool? IsActive { get; set; }
+
              public DateTime CreatedAt { get; set; }
     }
 

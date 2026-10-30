@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -86,7 +86,7 @@ namespace MIO.API.Controllers
         [HttpPut]
         [Route("{id}")]
         [Authorize(Roles ="Admin")]
-        public async Task<ActionResult> UpdateUser(int id, UpdateUserDTO userDTO)
+        public async Task<ActionResult> UpdateUser(int id, AdminUpdateUserDTO userDTO)
         {
 
             if (userDTO == null)

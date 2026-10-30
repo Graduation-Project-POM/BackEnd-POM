@@ -41,7 +41,7 @@ namespace MIO.Infrastructure.Services
                 PhoneNumber = userDTO.PhoneNumber,
                 Gender = userDTO.Gender,
                 ProfileImageUrl = userDTO.ProfileImageUrl,
-                IsActive = true,
+                IsActive = userDTO.IsActive ?? true,
                 CreatedAt = DateTime.UtcNow,
                 LastUpdatedAt = DateTime.UtcNow,
                 RoleID = userDTO.RoleID
@@ -57,6 +57,9 @@ namespace MIO.Infrastructure.Services
         // a unique one from the user's name, e.g. "john.smith", "john.smith2".
         private async Task<string> ResolveUserName(CreateUserDTO userDTO)
         {
+            if (await _dbContext.Users.AnyAsync(u => u.Email == userDTO.Email))
+                throw new AppException("EMAIL_EXISTS", "Email is already in use", StatusCodes.Status409Conflict);
+
             if (!string.IsNullOrWhiteSpace(userDTO.UserName))
             {
                 var requested = userDTO.UserName.Trim();
@@ -272,7 +275,39 @@ namespace MIO.Infrastructure.Services
                 .ToListAsync();
         }
 
-        public async Task<User?> UpdateUserService(int id, UpdateUserDTO userDTO)
+        public async Task<User?> UpdateUserService(int id, AdminUpdateUserDTO userDTO)
+        {
+            var existingUser = await ApplyProfileUpdate(id, userDTO);
+
+            var roleChanged = userDTO.RoleID.HasValue && userDTO.RoleID.Value != existingUser.RoleID;
+            var deactivated = userDTO.IsActive == false && existingUser.IsActive;
+            if (id == _currentUser.UserId && (roleChanged || deactivated))
+                throw new AppException("CANNOT_CHANGE_OWN_ACCESS", "You can't change your own role or deactivate your own account", StatusCodes.Status400BadRequest);
+
+            if (userDTO.RoleID.HasValue)
+                existingUser.RoleID = userDTO.RoleID.Value;
+            if (userDTO.IsActive.HasValue)
+                existingUser.IsActive = userDTO.IsActive.Value;
+
+            var passwordChanged = !string.IsNullOrEmpty(userDTO.NewPassword);
+            if (passwordChanged)
+            {
+                Security.CreatePasswordHash(userDTO.NewPassword!, out byte[] passwordHash, out byte[] passwordSalt);
+                existingUser.PasswordHash = passwordHash;
+                existingUser.PasswordSalt = passwordSalt;
+            }
+
+            // Force a fresh login so the new password / role / status takes effect.
+            if (passwordChanged || roleChanged || deactivated)
+                existingUser.RefreshTokenRevokedAt = DateTime.UtcNow;
+
+            await _dbContext.SaveChangesAsync();
+            await EnsureRoleProfile(existingUser);
+            return existingUser;
+        }
+
+        // Profile fields shared by the admin edit and PUT /User/me. Not saved yet.
+        private async Task<User> ApplyProfileUpdate(int id, UpdateUserDTO userDTO)
         {
             var existingUser = await _dbContext.Users.FirstOrDefaultAsync(u => u.Id == id);
 
@@ -287,6 +322,10 @@ namespace MIO.Infrastructure.Services
                     throw new AppException("USERNAME_EXISTS", $"Username '{userDTO.UserName}' is already taken", StatusCodes.Status409Conflict);
             }
 
+            if (existingUser.Email != userDTO.Email &&
+                await _dbContext.Users.AnyAsync(u => u.Email == userDTO.Email && u.Id != id))
+                throw new AppException("EMAIL_EXISTS", $"Email '{userDTO.Email}' is already in use", StatusCodes.Status409Conflict);
+
             existingUser.FirstName = userDTO.FirstName;
             existingUser.MiddleName = userDTO.MiddleName;
             existingUser.LastName = userDTO.LastName;
@@ -295,18 +334,23 @@ namespace MIO.Infrastructure.Services
             existingUser.PhoneNumber = userDTO.PhoneNumber;
             existingUser.Gender = userDTO.Gender;
             existingUser.ProfileImageUrl = userDTO.ProfileImageUrl;
-            existingUser.Bio = userDTO.Bio;
+            // The admin form has no bio field; null means "keep", "" clears it.
+            if (userDTO.Bio != null)
+                existingUser.Bio = userDTO.Bio;
             existingUser.LastUpdatedAt = DateTime.UtcNow;
 
-            await _dbContext.SaveChangesAsync();
             return existingUser;
         }
 
         public Task<UserResponseDTO?> GetCurrentUserService()
             => GetUserByIDService(_currentUser.UserId);
 
-        public Task<User?> UpdateCurrentUserService(UpdateUserDTO userDTO)
-            => UpdateUserService(_currentUser.UserId, userDTO);
+        public async Task<User?> UpdateCurrentUserService(UpdateUserDTO userDTO)
+        {
+            var user = await ApplyProfileUpdate(_currentUser.UserId, userDTO);
+            await _dbContext.SaveChangesAsync();
+            return user;
+        }
 
         public async Task<User?> DeleteUserService(int id)
         {
