@@ -10,7 +10,7 @@ using MIO.Core.Interfaces;
 using MIO.Infrastructure.Services;
 namespace MIO.Infrastructure.Services
 {
-    public class TrainerServices(AppDbContext _dbContext,ICurrentUserService _currentUser) : ITrainerService
+    public class TrainerServices(AppDbContext _dbContext,ICurrentUserService _currentUser, IUserService _userService) : ITrainerService
     {
 
         public async Task<Trainer?> CreateTrainer(CreateTrainerDTO trainerDTO)
@@ -193,9 +193,10 @@ namespace MIO.Infrastructure.Services
                  , StatusCodes.Status404NotFound);
 
 
-            _dbContext.Set<Trainer>().Remove(existingTrainer);
-
-            await _dbContext.SaveChangesAsync();
+            // Delete the whole account (same cleanup as DELETE /User/{id}): it keeps
+            // the trainer's problems/groups/contests, unowned, instead of failing
+            // on them, and doesn't leave a Trainer-role user with no profile.
+            await _userService.DeleteUserService(existingTrainer.UserId);
 
             return existingTrainer;
 

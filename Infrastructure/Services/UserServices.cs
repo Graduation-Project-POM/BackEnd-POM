@@ -359,8 +359,50 @@ namespace MIO.Infrastructure.Services
             if (existingUser == null)
                 throw new AppException("USER_NOT_FOUND", $"User with ID {id} not found", StatusCodes.Status404NotFound);
 
-            _dbContext.Users.Remove(existingUser);
-            await _dbContext.SaveChangesAsync();
+            if (id == _currentUser.UserId)
+                throw new AppException("CANNOT_DELETE_SELF", "You can't delete your own account", StatusCodes.Status400BadRequest);
+
+            // Users, Trainers, Students, comments and gallery rows use NO ACTION
+            // foreign keys, so dependents must be cleared first, all-or-nothing.
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync();
+
+            // Trainer: keep the problems/groups/contests they created, just unowned.
+            var trainerIds = _dbContext.Trainers.Where(t => t.UserId == id).Select(t => (int?)t.Id);
+            await _dbContext.Problems.Where(p => trainerIds.Contains(p.TrainerID))
+                .ExecuteUpdateAsync(s => s.SetProperty(p => p.TrainerID, (int?)null));
+            await _dbContext.Groups.Where(g => trainerIds.Contains(g.TrainerId))
+                .ExecuteUpdateAsync(s => s.SetProperty(g => g.TrainerId, (int?)null));
+            await _dbContext.Contests.Where(c => trainerIds.Contains(c.TrainerId))
+                .ExecuteUpdateAsync(s => s.SetProperty(c => c.TrainerId, (int?)null));
+            await _dbContext.Trainers.Where(t => t.UserId == id).ExecuteDeleteAsync();
+
+            // Student: contest/group/problem rows cascade in the database;
+            // bank submissions don't.
+            var studentIds = _dbContext.Students.Where(st => st.UserId == id).Select(st => st.Id);
+            await _dbContext.ProblemBankSubmissions.Where(b => studentIds.Contains(b.StudentId)).ExecuteDeleteAsync();
+            await _dbContext.Students.Where(st => st.UserId == id).ExecuteDeleteAsync();
+
+            // Same rule as deleting a discussion comment: replies go with their
+            // top-level comment (replies are only ever one level deep).
+            var commentIds = _dbContext.ProblemComments.Where(c => c.UserId == id).Select(c => (int?)c.Id);
+            await _dbContext.ProblemComments.Where(c => commentIds.Contains(c.ParentCommentId)).ExecuteDeleteAsync();
+            await _dbContext.ProblemComments.Where(c => c.UserId == id).ExecuteDeleteAsync();
+
+            await _dbContext.Gallery.Where(g => g.UploadedByID == id).ExecuteDeleteAsync();
+
+            await _dbContext.Users.Where(u => u.Id == id).ExecuteDeleteAsync();
+            await transaction.CommitAsync();
+
+            // The bulk deletes bypass the change tracker; drop any stale copies
+            // (callers like DeleteStudentService load the profile first) so a
+            // later SaveChanges on this context doesn't act on deleted rows.
+            foreach (var entry in _dbContext.ChangeTracker.Entries().ToList())
+            {
+                if (entry.Entity is User u && u.Id == id ||
+                    entry.Entity is Student st && st.UserId == id ||
+                    entry.Entity is Trainer t && t.UserId == id)
+                    entry.State = EntityState.Detached;
+            }
             return existingUser;
         }
     }

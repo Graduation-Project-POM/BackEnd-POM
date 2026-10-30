@@ -19,12 +19,14 @@ namespace MIO.Infrastructure.Services
     {
         private readonly AppDbContext _dbContext;
         private readonly ICurrentUserService _currentUser;
+        private readonly IUserService _userService;
       
         
-        public StudentServices(AppDbContext dbContext, ICurrentUserService currentUser)
+        public StudentServices(AppDbContext dbContext, ICurrentUserService currentUser, IUserService userService)
         {
             _dbContext = dbContext;
             _currentUser= currentUser;
+            _userService = userService;
         }
 
         public async Task<Student?> CreateStudent(CreateStudentDTO studentDTO)
@@ -287,8 +289,10 @@ namespace MIO.Infrastructure.Services
                     $"Student with ID {id} not found",
                     StatusCodes.Status404NotFound);
 
-            _dbContext.Students.Remove(existingStudent);
-            await _dbContext.SaveChangesAsync();
+            // Delete the whole account, not just the profile: a profile-less
+            // student user could still log in (e.g. a rejected applicant), and
+            // the account's other rows block a bare profile delete.
+            await _userService.DeleteUserService(existingStudent.UserId);
 
             return existingStudent;
         }
