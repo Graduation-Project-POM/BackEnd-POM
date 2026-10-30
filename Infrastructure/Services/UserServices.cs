@@ -231,6 +231,8 @@ namespace MIO.Infrastructure.Services
         {
 
             return await _dbContext.Users
+                .OrderByDescending(user => user.CreatedAt)
+                .ThenByDescending(user => user.Id)
                 .Select(user => new UserResponseDTO
                 {
                     Id = user.Id,
