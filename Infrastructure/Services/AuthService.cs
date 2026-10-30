@@ -1,4 +1,4 @@
-using System.IdentityModel.Tokens.Jwt;
+﻿using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
@@ -61,11 +61,17 @@ public class AuthService :IAuthService
         };
     }
     
-    public async Task<AuthResponseDTO> Refresh(JwtOptions jwtOptions,RefreshRequest request,int userId)
+    // Identified by the refresh token alone, so it works after the access token
+    // has expired. Each call issues a new 7-day refresh token, so the session
+    // slides forward for as long as the user keeps using the app.
+    public async Task<AuthResponseDTO> Refresh(JwtOptions jwtOptions,RefreshRequest request)
     {
+        if (string.IsNullOrWhiteSpace(request.RefreshToken))
+            throw new AppException("Invalid refresh token", StatusCodes.Status401Unauthorized);
+
+        var incomingHash = Security.HashRefreshToken(request.RefreshToken);
         var user = await _dbContext.Users
-            .FirstOrDefaultAsync(u => u.Id == userId);
-      
+            .FirstOrDefaultAsync(u => u.RefreshTokenHash == incomingHash);
     
         if (user == null)
             throw new AppException("Invalid refresh token", StatusCodes.Status401Unauthorized);
@@ -79,10 +85,6 @@ public class AuthService :IAuthService
     
         if (user.RefreshTokenExpiresAt == null || user.RefreshTokenExpiresAt <= DateTime.UtcNow)
             throw new AppException("Refresh token has expired",StatusCodes.Status401Unauthorized);
-    
-        var incomingHash = Security.HashRefreshToken(request.RefreshToken);
-        if (incomingHash != user.RefreshTokenHash)
-            throw new AppException("Invalid refresh token",StatusCodes.Status401Unauthorized);
     
         // Rotate refresh token
         var newRefreshToken = GenerateRefreshToken();

@@ -1,4 +1,4 @@
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using MIO.API.Settings;
 using MIO.Core.DTOs;
 using MIO.Core.Entities;
@@ -247,16 +247,19 @@ public class GroupService(AppDbContext db, ICurrentUserService currentUser) : IG
 
         await EnsureCanViewGroupAsync(groupId);
 
-        return await db.GroupContests
+        var contests = await db.GroupContests
             .Where(gc => gc.GroupId == groupId)
             .Select(gc => new GroupContestDto(
                 gc.ContestId,
                 gc.Contest.Title,
                 gc.AddDate,
                 gc.Contest.StartAt,
-                gc.Contest.EndAt
+                gc.Contest.EndAt,
+                0
             ))
             .ToListAsync();
+
+        return await WithParticipantCounts(contests);
     }
 
     public async Task<bool> AddContestAsync(int groupId, int contestId)
@@ -307,7 +310,7 @@ public class GroupService(AppDbContext db, ICurrentUserService currentUser) : IG
         if (!studentExists)
             throw new AppException($"Student with ID {studentId} not found", StatusCodes.Status404NotFound);
 
-        return await db.GroupStudents
+        var contests = await db.GroupStudents
             .Where(gs => gs.StudentId == studentId)
             .SelectMany(gs => gs.Group.GroupContests)
             .Select(gc => new GroupContestDto(
@@ -315,10 +318,21 @@ public class GroupService(AppDbContext db, ICurrentUserService currentUser) : IG
                 gc.Contest.Title,
                 gc.AddDate,
                 gc.Contest.StartAt,
-                gc.Contest.EndAt
+                gc.Contest.EndAt,
+                0
             ))
             .Distinct()
             .ToListAsync();
+
+        return await WithParticipantCounts(contests);
+    }
+
+    private async Task<List<GroupContestDto>> WithParticipantCounts(List<GroupContestDto> contests)
+    {
+        var counts = await db.CountByContestAsync(contests.Select(c => c.ContestId).Distinct().ToList());
+        return contests
+            .Select(c => c with { ParticipantCount = counts.GetValueOrDefault(c.ContestId) })
+            .ToList();
     }
 
     public async Task<IEnumerable<GroupResponseDto>> GetGroupsForStudentByUserIdAsync(int userId)

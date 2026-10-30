@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace MIO2.Core.DTOs.GroupDTOs;
 
@@ -8,5 +8,7 @@ public record GroupContestDto(
     string Title,
     DateOnly AddDate,
     DateTime StartAt,
-    DateTime EndAt
+    DateTime EndAt,
+    // Distinct students who submitted to this contest (see ContestParticipants).
+    int ParticipantCount = 0
 );

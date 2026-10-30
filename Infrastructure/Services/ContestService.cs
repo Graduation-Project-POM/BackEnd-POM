@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MIO.API.Settings;
 using MIO.Core.DTOs.ContestDTOs;
@@ -185,7 +185,7 @@ public class ContestService:IContestService
             query = query.Where(c => _dbContext.GroupContests
                 .Any(gc => gc.ContestId == c.Id && gc.Group.TrainerId == trainerId));
 
-        return await query
+        var contests = await query
             .Select(c => new ContestDTO
             {
                 Id = c.Id,
@@ -195,10 +195,14 @@ public class ContestService:IContestService
                 StartAt = c.StartAt,
                 EndAt = c.EndAt,
                 TrainerId = c.TrainerId ?? 0,
-                ProblemCount = c.Problems.Count,
-                StudentCount = c.ContestStudents.Count
+                ProblemCount = c.Problems.Count
             })
             .ToListAsync();
+
+        var counts = await _dbContext.CountByContestAsync(contests.Select(c => c.Id).ToList());
+        foreach (var contest in contests)
+            contest.StudentCount = counts.GetValueOrDefault(contest.Id);
+        return contests;
     }
 
     public async Task<ContestDTO> GetContestById(int contestId)
@@ -214,14 +218,14 @@ public class ContestService:IContestService
                 StartAt = c.StartAt,
                 EndAt = c.EndAt,
                 TrainerId = c.TrainerId ?? 0,
-                ProblemCount = c.Problems.Count,
-                StudentCount = c.ContestStudents.Count
+                ProblemCount = c.Problems.Count
             })
             .FirstOrDefaultAsync();
 
         if (contest == null)
             throw new AppException($"Contest with ID {contestId} not found", StatusCodes.Status404NotFound);
 
+        contest.StudentCount = await _dbContext.CountForContestAsync(contestId);
         return contest;
     }
 
@@ -520,7 +524,7 @@ public class ContestService:IContestService
             EndAt = contest.EndAt,
             TrainerId = contest.TrainerId ?? 0,
             ProblemCount = contest.Problems.Count,
-            StudentCount = contest.ContestStudents?.Count ?? 0
+            StudentCount = await _dbContext.CountForContestAsync(contest.Id)
         };
     }
     

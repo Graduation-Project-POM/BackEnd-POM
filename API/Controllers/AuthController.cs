@@ -1,4 +1,4 @@
-using System.Security.Claims;
+﻿using System.Security.Claims;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
@@ -43,11 +43,12 @@ public class AuthController(JwtOptions jwtOptions,IUserService userServices, IAu
     
     [HttpPost("refresh")]
     [EnableRateLimiting("AuthLimiter")]
+    // Anonymous on purpose: it's called once the access token has expired. The
+    // refresh token itself is the credential.
+    [AllowAnonymous]
     public async Task<IActionResult> Refresh([FromBody] RefreshRequest request)
     {
-        var userId = int.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
-
-        var refreshedToken = await authService.Refresh(jwtOptions, request,userId);
+        var refreshedToken = await authService.Refresh(jwtOptions, request);
         return Ok(refreshedToken);
 
     }
