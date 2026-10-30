@@ -1,4 +1,4 @@
-﻿using MIO.Core.DTOs.StudentDTO;
+using MIO.Core.DTOs.StudentDTO;
 using MIO.Core.DTOs.StudentDtos;
 using MIO.Core.DTOs.TrainerDtos;
 using MIO.Core.Entities;
@@ -15,7 +15,7 @@ namespace MIO.Core.DTOs.UserDtos
         public string Email { get; set; }
         public string UserName { get; set; }
         public string? PhoneNumber { get; set; }
-        public Gender Gender { get; set; }
+        public Gender? Gender { get; set; }
         public string ProfileImageUrl { get; set; }
         public string? Bio { get; set; }
         public bool IsActive { get; set; }

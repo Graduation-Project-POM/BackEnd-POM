@@ -1,4 +1,4 @@
-﻿using MIO.Core.Enums;
+using MIO.Core.Enums;
 using System.ComponentModel.DataAnnotations;
 
 namespace MIO.Core.DTOs.UserDtos
@@ -16,12 +16,11 @@ namespace MIO.Core.DTOs.UserDtos
             [Required]
             [EmailAddress]
             public string Email { get; set; }
-            [Required]
-            [MinLength(4)]  
-            public required string UserName { get; set; }
+            // Optional: generated from the user's name when left empty.
+            [MinLength(4)]
+            public string? UserName { get; set; }
             [Phone]
             public string? PhoneNumber { get; set; }
-            [Required]
             public Gender? Gender { get; set; }
 
             public string ProfileImageUrl { get; set; }

@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using MIO.API.Authentication;
 using MIO.API.Settings;
@@ -25,8 +25,7 @@ namespace MIO.Infrastructure.Services
 
         public async Task<User?> CreateUser(CreateUserDTO userDTO)
         {
-            if (await _dbContext.Users.AnyAsync(u => u.UserName == userDTO.UserName))
-                throw new AppException("USERNAME_EXISTS", "Username already exists", StatusCodes.Status409Conflict);
+            var userName = await ResolveUserName(userDTO);
 
             Security.CreatePasswordHash(userDTO.Password, out byte[] passwordHash, out byte[] passwordSalt);
 
@@ -36,11 +35,11 @@ namespace MIO.Infrastructure.Services
                 MiddleName = userDTO.MiddleName,
                 LastName = userDTO.LastName,
                 Email = userDTO.Email,
-                UserName = userDTO.UserName,
+                UserName = userName,
                 PasswordHash = passwordHash,
                 PasswordSalt = passwordSalt,
                 PhoneNumber = userDTO.PhoneNumber,
-                Gender = userDTO.Gender!.Value,
+                Gender = userDTO.Gender,
                 ProfileImageUrl = userDTO.ProfileImageUrl,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
@@ -52,6 +51,43 @@ namespace MIO.Infrastructure.Services
             await _dbContext.SaveChangesAsync();
             await EnsureRoleProfile(user);
             return user;
+        }
+
+        // Use the supplied username if any (public sign-up); otherwise generate
+        // a unique one from the user's name, e.g. "john.smith", "john.smith2".
+        private async Task<string> ResolveUserName(CreateUserDTO userDTO)
+        {
+            if (!string.IsNullOrWhiteSpace(userDTO.UserName))
+            {
+                var requested = userDTO.UserName.Trim();
+                if (await _dbContext.Users.AnyAsync(u => u.UserName == requested))
+                    throw new AppException("USERNAME_EXISTS", "Username already exists", StatusCodes.Status409Conflict);
+                return requested;
+            }
+
+            static string Clean(string? s) =>
+                new string((s ?? "").Trim().ToLowerInvariant().Where(char.IsLetterOrDigit).ToArray());
+
+            var first = Clean(userDTO.FirstName);
+            var last = Clean(userDTO.LastName);
+            var baseName = string.Join(".", new[] { first, last }.Where(p => p.Length > 0));
+            if (baseName.Length < 4)
+                baseName = Clean(userDTO.Email?.Split('@')[0]);
+            if (baseName.Length < 4)
+                baseName = "user" + baseName;
+            if (baseName.Length > 56)
+                baseName = baseName[..56];
+
+            var taken = await _dbContext.Users
+                .Where(u => u.UserName.StartsWith(baseName))
+                .Select(u => u.UserName)
+                .ToListAsync();
+            var takenSet = new HashSet<string>(taken, StringComparer.OrdinalIgnoreCase);
+
+            var candidate = baseName;
+            for (var i = 2; takenSet.Contains(candidate); i++)
+                candidate = baseName + i;
+            return candidate;
         }
 
         // Ensure a user with the Student/Trainer role has the matching entity row,
@@ -88,8 +124,7 @@ namespace MIO.Infrastructure.Services
 
         public async Task<User?> RegisterStudent(CreateUserDTO userDTO)
         {
-            if (await _dbContext.Users.AnyAsync(u => u.UserName == userDTO.UserName))
-                throw new AppException("USERNAME_EXISTS", "Username already exists", StatusCodes.Status409Conflict);
+            var userName = await ResolveUserName(userDTO);
 
             Security.CreatePasswordHash(userDTO.Password, out byte[] passwordHash, out byte[] passwordSalt);
 
@@ -99,11 +134,11 @@ namespace MIO.Infrastructure.Services
                 MiddleName = userDTO.MiddleName,
                 LastName = userDTO.LastName,
                 Email = userDTO.Email,
-                UserName = userDTO.UserName,
+                UserName = userName,
                 PasswordHash = passwordHash,
                 PasswordSalt = passwordSalt,
                 PhoneNumber = userDTO.PhoneNumber,
-                Gender = userDTO.Gender!.Value,
+                Gender = userDTO.Gender,
                 ProfileImageUrl = userDTO.ProfileImageUrl,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
@@ -256,7 +291,7 @@ namespace MIO.Infrastructure.Services
             existingUser.Email = userDTO.Email;
             existingUser.UserName = userDTO.UserName;
             existingUser.PhoneNumber = userDTO.PhoneNumber;
-            existingUser.Gender = userDTO.Gender!.Value;
+            existingUser.Gender = userDTO.Gender;
             existingUser.ProfileImageUrl = userDTO.ProfileImageUrl;
             existingUser.Bio = userDTO.Bio;
             existingUser.LastUpdatedAt = DateTime.UtcNow;

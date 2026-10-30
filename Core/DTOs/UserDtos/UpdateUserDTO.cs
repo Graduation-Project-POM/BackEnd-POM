@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 using MIO.Core.Enums;
 
 namespace MIO.Core.DTOs.UserDtos
@@ -21,7 +21,6 @@ namespace MIO.Core.DTOs.UserDtos
             public required string UserName { get; set; }
             [Phone]
             public string? PhoneNumber { get; set; }
-            [Required]
             public Gender? Gender { get; set; }
 
             public string ProfileImageUrl { get; set; }
