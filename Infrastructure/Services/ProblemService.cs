@@ -135,14 +135,9 @@ public class ProblemService : IProblemServices
         // for students — they have separate per-contest endpoints. Admin and the
         // contest's owning trainer can still fetch the record (needed for the
         // contest's Edit Problem flow).
-        // A trainer may also read problems of contests they manage — contests they
-        // created or that are attached to one of their groups (same rule as
-        // ContestService.CanTrainerManageContestAsync) — e.g. to view a problem's
-        // full details from their group page even if another user created it.
-        var managesContainingContest = myTrainerId != null && await _context.Contests
-            .AnyAsync(c => c.Problems.Any(cp => cp.ID == id) &&
-                           (c.TrainerId == myTrainerId ||
-                            _context.GroupContests.Any(gc => gc.ContestId == c.Id && gc.Group.TrainerId == myTrainerId)));
+        // A trainer may also read problems of contests they manage, e.g. to view a
+        // problem's full details from their group page even if another user created it.
+        var managesContainingContest = await TrainerManagesContestContainingAsync(id, myTrainerId);
 
         if (!p.IsBankProblem)
         {
@@ -251,14 +246,21 @@ public class ProblemService : IProblemServices
                 StatusCodes.Status404NotFound);
         }
 
+        // Admins can edit any problem. A trainer can edit a problem they created,
+        // or one in a contest they manage (created it, or it belongs to a group
+        // they lead), even when the problem was created by someone else.
         if (_currentUser.Role == "Trainer")
         {
-            var trainer = await _context.Trainers
-                .FirstOrDefaultAsync(t => t.UserId == _currentUser.UserId);
-            if (trainer == null || problem.TrainerID != trainer.Id)
+            var trainerId = await _context.Trainers
+                .Where(t => t.UserId == _currentUser.UserId)
+                .Select(t => (int?)t.Id)
+                .FirstOrDefaultAsync();
+            var owns = trainerId != null && problem.TrainerID == trainerId;
+            if (!owns && !await TrainerManagesContestContainingAsync(id, trainerId))
             {
                 throw new AppException(
-                    "You can only edit problems you created",
+                    "FORBIDDEN",
+                    "You can only edit problems you created or problems in contests you manage.",
                     StatusCodes.Status403Forbidden);
             }
         }
@@ -487,6 +489,21 @@ public class ProblemService : IProblemServices
                 ProblemPoints = ps.Problem.Points
             })
             .ToListAsync();
+    }
+
+    /// <summary>
+    /// True when the trainer manages at least one contest that contains the
+    /// problem: a contest they created, or one attached to a group they lead.
+    /// Same rule as ContestService.CanTrainerManageContestAsync. Used for both
+    /// viewing (GetById) and editing (Update) contest problems.
+    /// </summary>
+    private async Task<bool> TrainerManagesContestContainingAsync(int problemId, int? trainerId)
+    {
+        if (trainerId == null) return false;
+        return await _context.Contests
+            .AnyAsync(c => c.Problems.Any(p => p.ID == problemId) &&
+                           (c.TrainerId == trainerId ||
+                            _context.GroupContests.Any(gc => gc.ContestId == c.Id && gc.Group.TrainerId == trainerId)));
     }
 
     private async Task EnsureCanGradeAsync(Problem problem)
