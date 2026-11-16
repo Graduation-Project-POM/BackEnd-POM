@@ -201,13 +201,6 @@ public class ProblemService : IProblemServices
             }
         }
 
-      
-        if (await _context.Problems.AnyAsync(p => p.Title == dto.Title))
-        {
-            throw new AppException(
-                "Problem with same title already exists",
-                StatusCodes.Status409Conflict);
-        }
 
         var problem = new Problem
         {

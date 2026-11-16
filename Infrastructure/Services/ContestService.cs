@@ -503,16 +503,27 @@ public class ContestService:IContestService
         if (dto.EndAt.HasValue)
             contest.EndAt = dto.EndAt.Value;
 
+        List<int> removedProblemIds = [];
         if (dto.ProblemIds != null)
         {
             var problems = await _dbContext.Problems
                 .Where(p => dto.ProblemIds.Contains(p.ID))
                 .ToListAsync();
 
+            removedProblemIds = contest.Problems
+                .Select(p => p.ID)
+                .Except(problems.Select(p => p.ID))
+                .ToList();
+
             contest.Problems = problems;
         }
 
         await _dbContext.SaveChangesAsync();
+
+        // Problems created inside a contest (not bank problems) only exist for
+        // that contest. Once unlinked they are unreachable from the UI but would
+        // still hold their title, blocking a new problem with the same name.
+        await DeleteOrphanedContestProblemsAsync(removedProblemIds);
 
         return new ContestDTO
         {
@@ -550,7 +561,32 @@ public class ContestService:IContestService
         if (!isAdmin && !await CanTrainerManageContestAsync(contestId, contest.TrainerId, trainerId))
             throw new AppException("You are not authorized to delete this contest", StatusCodes.Status403Forbidden);
 
+        var contestProblemIds = await _dbContext.Contests
+            .Where(c => c.Id == contestId)
+            .SelectMany(c => c.Problems.Select(p => p.ID))
+            .ToListAsync();
+
         _dbContext.Contests.Remove(contest);
+        await _dbContext.SaveChangesAsync();
+
+        await DeleteOrphanedContestProblemsAsync(contestProblemIds);
+    }
+
+    /// <summary>
+    /// Deletes contest-only problems (IsBankProblem = false) from the given ids
+    /// that are no longer attached to any contest.
+    /// </summary>
+    private async Task DeleteOrphanedContestProblemsAsync(IReadOnlyCollection<int> problemIds)
+    {
+        if (problemIds.Count == 0) return;
+
+        var orphans = await _dbContext.Problems
+            .Where(p => problemIds.Contains(p.ID) && !p.IsBankProblem && !p.Contests.Any())
+            .ToListAsync();
+
+        if (orphans.Count == 0) return;
+
+        _dbContext.Problems.RemoveRange(orphans);
         await _dbContext.SaveChangesAsync();
     }
 
