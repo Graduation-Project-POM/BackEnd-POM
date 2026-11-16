@@ -364,21 +364,30 @@ public class ProblemService : IProblemServices
         if (string.IsNullOrWhiteSpace(dto.SolutionText) && string.IsNullOrWhiteSpace(dto.PhotoFileKey))
             throw new AppException("You must provide a solution text or a photo", StatusCodes.Status400BadRequest);
 
-        bool alreadySubmitted = await _context.ProblemStudents
-            .AnyAsync(ps => ps.ProblemId == problemId && ps.StudentId == student.Id);
-        if (alreadySubmitted)
-            throw new AppException("You have already submitted a solution for this problem", StatusCodes.Status409Conflict);
+        // One submission per student per problem. Resubmitting edits it — but only
+        // until it has been graded; after that the solution is final.
+        var submission = await _context.ProblemStudents
+            .FirstOrDefaultAsync(ps => ps.ProblemId == problemId && ps.StudentId == student.Id);
 
-        var submission = new ProblemStudent
+        if (submission != null)
         {
-            ProblemId = problemId,
-            StudentId = student.Id,
-            SubmittedSolutionText = dto.SolutionText,
-            SubmittedSolutionPhotoKey = dto.PhotoFileKey,
-            SubmittedAt = DateTime.UtcNow
-        };
-
-        _context.ProblemStudents.Add(submission);
+            EnsureNotGraded(submission);
+            submission.SubmittedSolutionText = dto.SolutionText;
+            submission.SubmittedSolutionPhotoKey = dto.PhotoFileKey;
+            submission.SubmittedAt = DateTime.UtcNow;
+        }
+        else
+        {
+            submission = new ProblemStudent
+            {
+                ProblemId = problemId,
+                StudentId = student.Id,
+                SubmittedSolutionText = dto.SolutionText,
+                SubmittedSolutionPhotoKey = dto.PhotoFileKey,
+                SubmittedAt = DateTime.UtcNow
+            };
+            _context.ProblemStudents.Add(submission);
+        }
         await _context.SaveChangesAsync();
 
         await RecomputeAggregatesAsync(problemId, student.Id);
@@ -441,13 +450,34 @@ public class ProblemService : IProblemServices
 
         await EnsureCanGradeAsync(problem);
 
+        // Contest submissions can be graded only after the contest has finished —
+        // by anyone, Admin included (if the problem is in several contests, after
+        // all of them have).
+        var now = DateTime.UtcNow;
+        var contestStillRunning = await _context.Contests
+            .AnyAsync(c => c.Problems.Any(p => p.ID == problem.ID) && c.EndAt >= now);
+        if (contestStillRunning)
+            throw new AppException(
+                "CONTEST_NOT_ENDED",
+                "You can grade submissions only after the contest has ended.",
+                StatusCodes.Status403Forbidden);
+
+        // A score is always required to grade; feedback alone can't be saved.
+        if (dto.Grade == null)
+            throw new AppException(
+                "SCORE_REQUIRED",
+                string.IsNullOrWhiteSpace(dto.Feedback)
+                    ? "Enter a score to grade this submission."
+                    : "Enter a score before saving feedback.",
+                StatusCodes.Status400BadRequest);
+
         if (dto.Grade < 0 || dto.Grade > problem.Points)
             throw new AppException(
                 "GRADE_OUT_OF_RANGE",
                 $"Grade must be between 0 and {problem.Points} for this problem.",
                 StatusCodes.Status400BadRequest);
 
-        submission.Score = dto.Grade;
+        submission.Score = dto.Grade.Value;
         submission.Feedback = dto.Feedback;
         submission.GradedAt = DateTime.UtcNow;
         await _context.SaveChangesAsync();
@@ -504,6 +534,16 @@ public class ProblemService : IProblemServices
             .AnyAsync(c => c.Problems.Any(p => p.ID == problemId) &&
                            (c.TrainerId == trainerId ||
                             _context.GroupContests.Any(gc => gc.ContestId == c.Id && gc.Group.TrainerId == trainerId)));
+    }
+
+    /// <summary>A graded contest submission is final: the student can no longer change or delete it.</summary>
+    private static void EnsureNotGraded(ProblemStudent submission)
+    {
+        if (submission.Score != null)
+            throw new AppException(
+                "SUBMISSION_GRADED",
+                "Your solution has already been graded and can no longer be changed.",
+                StatusCodes.Status403Forbidden);
     }
 
     private async Task EnsureCanGradeAsync(Problem problem)
@@ -1167,6 +1207,9 @@ public class ProblemService : IProblemServices
             throw new AppException($"Submission {submissionId} not found", StatusCodes.Status404NotFound);
         if (submission.StudentId != myStudentId)
             throw new AppException("You can only delete your own submissions", StatusCodes.Status403Forbidden);
+
+        // Deleting and resubmitting would be a way around the "no edits after grading" rule.
+        EnsureNotGraded(submission);
 
         _context.ProblemStudents.Remove(submission);
         await _context.SaveChangesAsync();
