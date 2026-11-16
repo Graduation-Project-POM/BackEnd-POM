@@ -14,6 +14,7 @@ public class Contest
     
     
     public ContestStatus Status { get; set; } = ContestStatus.Upcoming;
+    public Difficulty Difficulty { get; set; } = Difficulty.Medium;
     
     
     public ICollection<ContestStudent> ContestStudents { get; set; } = [];

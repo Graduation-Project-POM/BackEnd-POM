@@ -281,6 +281,9 @@ namespace MIO.Migrations
                         .HasMaxLength(2000)
                         .HasColumnType("nvarchar(2000)");
 
+                    b.Property<int>("Difficulty")
+                        .HasColumnType("int");
+
                     b.Property<DateTime>("EndAt")
                         .HasColumnType("datetime2");
 

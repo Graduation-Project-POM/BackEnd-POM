@@ -9,6 +9,7 @@ public class createContestDTO
 
     [Required]
     public ContestStatus Status { get; set; } = ContestStatus.Upcoming;
+    public Difficulty Difficulty { get; set; } = Difficulty.Medium;
     public ICollection<int> ProblemIds { get; set; } = [];
     [Required]
     public DateTime StartAt { get; set; }
