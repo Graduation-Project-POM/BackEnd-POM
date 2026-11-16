@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MIO.API.Settings;
@@ -403,9 +403,12 @@ public class ProblemService : IProblemServices
 
         await EnsureCanGradeAsync(problem);
 
+        // Grading view (trainers/admins only): drafts are included. "Draft" only
+        // hides a solution from other students; the trainer still has to see and
+        // grade every contest/group submission. IsPublished is returned so the
+        // UI can tell drafts apart.
         return await _context.ProblemStudents
             .Where(ps => ps.ProblemId == problemId)
-            .Where(ps => ps.IsPublished)
             .Include(ps => ps.Student).ThenInclude(s => s.User)
             .OrderByDescending(ps => ps.SubmittedAt)
             .Select(ps => new SubmissionResponseDto
