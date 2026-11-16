@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MIO.API.Settings;
 using MIO.Core.DTOs.ContestDTOs;
@@ -195,7 +195,15 @@ public class ContestService:IContestService
                 StartAt = c.StartAt,
                 EndAt = c.EndAt,
                 TrainerId = c.TrainerId ?? 0,
-                ProblemCount = c.Problems.Count
+                ProblemCount = c.Problems.Count,
+                GroupId = _dbContext.GroupContests
+                    .Where(gc => gc.ContestId == c.Id)
+                    .Select(gc => (int?)gc.GroupId)
+                    .FirstOrDefault(),
+                GroupName = _dbContext.GroupContests
+                    .Where(gc => gc.ContestId == c.Id)
+                    .Select(gc => gc.Group.Name)
+                    .FirstOrDefault()
             })
             .ToListAsync();
 
@@ -218,7 +226,15 @@ public class ContestService:IContestService
                 StartAt = c.StartAt,
                 EndAt = c.EndAt,
                 TrainerId = c.TrainerId ?? 0,
-                ProblemCount = c.Problems.Count
+                ProblemCount = c.Problems.Count,
+                GroupId = _dbContext.GroupContests
+                    .Where(gc => gc.ContestId == c.Id)
+                    .Select(gc => (int?)gc.GroupId)
+                    .FirstOrDefault(),
+                GroupName = _dbContext.GroupContests
+                    .Where(gc => gc.ContestId == c.Id)
+                    .Select(gc => gc.Group.Name)
+                    .FirstOrDefault()
             })
             .FirstOrDefaultAsync();
 
@@ -505,6 +521,29 @@ public class ContestService:IContestService
         if (dto.EndAt.HasValue)
             contest.EndAt = dto.EndAt.Value;
 
+        // Move the contest to another group. A contest belongs to exactly one group,
+        // so the old link is replaced. Participants are derived from the group's
+        // members, so they follow the contest to its new group.
+        if (dto.GroupId.HasValue && dto.GroupId.Value > 0)
+        {
+            var newGroup = await _dbContext.Groups.FirstOrDefaultAsync(g => g.Id == dto.GroupId.Value);
+            if (newGroup == null)
+                throw new AppException($"Group with ID {dto.GroupId.Value} not found", StatusCodes.Status404NotFound);
+
+            if (!isAdmin && newGroup.TrainerId != trainerId)
+                throw new AppException("You can only assign contests to your own groups.", StatusCodes.Status403Forbidden);
+
+            var links = await _dbContext.GroupContests
+                .Where(gc => gc.ContestId == contest.Id)
+                .ToListAsync();
+
+            if (links.Count != 1 || links[0].GroupId != newGroup.Id)
+            {
+                _dbContext.GroupContests.RemoveRange(links);
+                _dbContext.GroupContests.Add(new GroupContest { GroupId = newGroup.Id, ContestId = contest.Id });
+            }
+        }
+
         List<int> removedProblemIds = [];
         if (dto.ProblemIds != null)
         {
@@ -544,7 +583,15 @@ public class ContestService:IContestService
             EndAt = contest.EndAt,
             TrainerId = contest.TrainerId ?? 0,
             ProblemCount = contest.Problems.Count,
-            StudentCount = await _dbContext.CountForContestAsync(contest.Id)
+            StudentCount = await _dbContext.CountForContestAsync(contest.Id),
+            GroupId = await _dbContext.GroupContests
+                .Where(gc => gc.ContestId == contest.Id)
+                .Select(gc => (int?)gc.GroupId)
+                .FirstOrDefaultAsync(),
+            GroupName = await _dbContext.GroupContests
+                .Where(gc => gc.ContestId == contest.Id)
+                .Select(gc => gc.Group.Name)
+                .FirstOrDefaultAsync()
         };
     }
     

@@ -10,4 +10,6 @@ public class UpdateContestDTO
     public DateTime? StartAt { get; set; }
     public DateTime? EndAt { get; set; }
     public List<int>? ProblemIds { get; set; }
+    // Moves the contest to this group when set.
+    public int? GroupId { get; set; }
 }

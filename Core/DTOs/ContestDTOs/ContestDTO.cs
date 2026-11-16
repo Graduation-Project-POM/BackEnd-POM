@@ -13,4 +13,7 @@ public class ContestDTO
     public int TrainerId { get; set; }
     public int ProblemCount { get; set; }
     public int StudentCount { get; set; }
+    // The group the contest is assigned to (a contest belongs to one group).
+    public int? GroupId { get; set; }
+    public string? GroupName { get; set; }
 }

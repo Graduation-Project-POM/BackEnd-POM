@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using MIO.API.Settings;
 using MIO.Core.DTOs;
 using MIO.Core.Entities;
@@ -114,6 +114,18 @@ public class GroupService(AppDbContext db, ICurrentUserService currentUser) : IG
 
         group.Name = dto.Name;
         group.Description = dto.Description;
+
+        if (dto.TrainerId is int newTrainerId && newTrainerId > 0 && newTrainerId != group.TrainerId)
+        {
+            if (currentUser.Role != "Admin")
+                throw new AppException("Only an admin can change a group's trainer.", StatusCodes.Status403Forbidden);
+
+            bool trainerExists = await db.Trainers.AnyAsync(t => t.Id == newTrainerId);
+            if (!trainerExists)
+                throw new AppException($"Trainer with ID {newTrainerId} not found", StatusCodes.Status404NotFound);
+
+            group.TrainerId = newTrainerId;
+        }
 
         await db.SaveChangesAsync();
         return true;
