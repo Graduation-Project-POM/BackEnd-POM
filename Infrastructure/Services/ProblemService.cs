@@ -135,10 +135,19 @@ public class ProblemService : IProblemServices
         // for students — they have separate per-contest endpoints. Admin and the
         // contest's owning trainer can still fetch the record (needed for the
         // contest's Edit Problem flow).
+        // A trainer may also read problems of contests they manage — contests they
+        // created or that are attached to one of their groups (same rule as
+        // ContestService.CanTrainerManageContestAsync) — e.g. to view a problem's
+        // full details from their group page even if another user created it.
+        var managesContainingContest = myTrainerId != null && await _context.Contests
+            .AnyAsync(c => c.Problems.Any(cp => cp.ID == id) &&
+                           (c.TrainerId == myTrainerId ||
+                            _context.GroupContests.Any(gc => gc.ContestId == c.Id && gc.Group.TrainerId == myTrainerId)));
+
         if (!p.IsBankProblem)
         {
             var owns = myTrainerId != null && p.TrainerID == myTrainerId;
-            if (!isAdmin && !owns)
+            if (!isAdmin && !owns && !managesContainingContest)
                 throw new AppException(
                     $"Problem with ID {id} not found",
                     StatusCodes.Status404NotFound);
@@ -151,7 +160,7 @@ public class ProblemService : IProblemServices
                 StatusCodes.Status404NotFound);
         }
 
-        if (role == "Trainer" && !p.IsPublished && (myTrainerId == null || p.TrainerID != myTrainerId))
+        if (role == "Trainer" && !p.IsPublished && !managesContainingContest && (myTrainerId == null || p.TrainerID != myTrainerId))
         {
             throw new AppException(
                 $"Problem with ID {id} not found",
