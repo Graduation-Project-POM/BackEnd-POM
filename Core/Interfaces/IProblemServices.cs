@@ -26,6 +26,8 @@ public interface IProblemServices
 
     Task<MyProblemSolutionsDto?> GetMyDraftsForProblem(int problemId);
 
+    Task<StudentProblemSolutionsDto> GetStudentProblemSolutions(int problemId, bool includeOthers);
+
     Task DeleteBankSubmission(int submissionId);
     Task SetBankSubmissionVisibility(int submissionId, bool isPublished);
     Task DeleteContestSubmission(int submissionId);

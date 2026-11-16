@@ -229,6 +229,18 @@ public class ProblemsController : ControllerBase
         return Ok(result);
     }
 
+    // Student Problem Bank: own submissions always; other students' published
+    // submissions only when includeOthers=true.
+    [HttpGet("{id}/bank/solutions")]
+    [Authorize(Roles = "Student")]
+    public async Task<ActionResult<StudentProblemSolutionsDto>> GetStudentProblemSolutions(int id, [FromQuery] bool includeOthers = false)
+    {
+        if (id <= 0)
+            return BadRequest("Invalid ID");
+
+        return Ok(await _Problemservice.GetStudentProblemSolutions(id, includeOthers));
+    }
+
     [HttpGet("{id}/my-drafts")]
     [Authorize(Roles = "Student")]
     public async Task<ActionResult<MyProblemSolutionsDto>> GetMyDraftsForProblem(int id)

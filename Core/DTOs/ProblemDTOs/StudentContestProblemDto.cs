@@ -1,4 +1,4 @@
-using MIO.Core.Enums;
+﻿using MIO.Core.Enums;
 
 namespace MIO.Core.DTOs.ProblemDTOs;
 
@@ -10,6 +10,8 @@ public class StudentContestProblemDto
     public int ProblemId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Statement { get; set; }
+    public string? Constraints { get; set; }
+    public List<ProblemExampleDto>? Examples { get; set; }
     public Difficulty Difficulty { get; set; }
     public string Topic { get; set; } = string.Empty;
     public string? PhotoUrl { get; set; }

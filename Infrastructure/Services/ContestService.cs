@@ -307,7 +307,7 @@ public class ContestService:IContestService
         var problems = await _dbContext.Contests
             .Where(c => c.Id == contestId)
             .SelectMany(c => c.Problems)
-            .Select(p => new { p.ID, p.Title, p.Statement, p.Difficulty, p.Topic, p.PhotoFileKey, p.Points, p.SolvedCount })
+            .Select(p => new { p.ID, p.Title, p.Statement, p.Constraints, p.Examples, p.Difficulty, p.Topic, p.PhotoFileKey, p.Points, p.SolvedCount })
             .ToListAsync();
 
         var problemIds = problems.Select(p => p.ID).ToList();
@@ -324,6 +324,8 @@ public class ContestService:IContestService
                 ProblemId = p.ID,
                 Title = p.Title,
                 Statement = p.Statement,
+                Constraints = p.Constraints,
+                Examples = ProblemService.DeserializeExamples(p.Examples),
                 Difficulty = p.Difficulty,
                 Topic = p.Topic,
                 PhotoUrl = string.IsNullOrEmpty(p.PhotoFileKey) ? null : p.PhotoFileKey,

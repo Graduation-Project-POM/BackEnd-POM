@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MIO.API.Settings;
@@ -29,7 +29,7 @@ public class ProblemService : IProblemServices
         _currentUser = currentUser;
     }
 
-    private static List<ProblemExampleDto>? DeserializeExamples(string? json)
+    internal static List<ProblemExampleDto>? DeserializeExamples(string? json)
     {
         if (string.IsNullOrWhiteSpace(json)) return null;
         try { return JsonSerializer.Deserialize<List<ProblemExampleDto>>(json); }
@@ -886,6 +886,97 @@ public class ProblemService : IProblemServices
             ContestSubmissions = contest
         };
     }
+
+    // Student Problem Bank: the current student's own submissions (published and
+    // hidden) separately from other students' submissions. Other students' rows
+    // are only queried when includeOthers is true, and only published ones are
+    // returned, so submissions their authors hid never leave the server.
+    public async Task<StudentProblemSolutionsDto> GetStudentProblemSolutions(int problemId, bool includeOthers)
+    {
+        var studentId = await _context.Students
+            .Where(s => s.UserId == _currentUser.UserId)
+            .Select(s => (int?)s.Id)
+            .FirstOrDefaultAsync();
+        if (studentId == null)
+            throw new AppException("Only students can view problem bank solutions", StatusCodes.Status403Forbidden);
+
+        // Same visibility rule as GetById for students: unpublished problems don't exist for them.
+        var problemVisible = await _context.Problems.AnyAsync(p => p.ID == problemId && p.IsPublished);
+        if (!problemVisible)
+            throw new AppException($"Problem with ID {problemId} not found", StatusCodes.Status404NotFound);
+
+        var me = studentId.Value;
+        var result = new StudentProblemSolutionsDto
+        {
+            ProblemId = problemId,
+            Mine = new SubmissionListsDto
+            {
+                BankSubmissions = await ProjectBankSubmissions(
+                    _context.ProblemBankSubmissions.Where(s => s.ProblemId == problemId && s.StudentId == me),
+                    isMine: true),
+                ContestSubmissions = await ProjectContestSubmissions(
+                    _context.ProblemStudents.Where(s => s.ProblemId == problemId && s.StudentId == me),
+                    isMine: true),
+            },
+        };
+
+        if (includeOthers)
+        {
+            result.Others = new SubmissionListsDto
+            {
+                BankSubmissions = await ProjectBankSubmissions(
+                    _context.ProblemBankSubmissions.Where(s => s.ProblemId == problemId && s.StudentId != me && s.IsPublished),
+                    isMine: false),
+                ContestSubmissions = await ProjectContestSubmissions(
+                    _context.ProblemStudents.Where(s => s.ProblemId == problemId && s.StudentId != me && s.IsPublished),
+                    isMine: false),
+            };
+        }
+
+        return result;
+    }
+
+    // Other students' contact details and trainer feedback are not shared with peers.
+    private static Task<List<BankSubmissionResponseDto>> ProjectBankSubmissions(
+        IQueryable<ProblemBankSubmission> query, bool isMine) =>
+        query
+            .OrderByDescending(s => s.SubmittedAt)
+            .Select(s => new BankSubmissionResponseDto
+            {
+                Id = s.Id,
+                ProblemId = s.ProblemId,
+                StudentId = s.StudentId,
+                StudentName = s.Student.User.FirstName + " " + s.Student.User.LastName,
+                StudentEmail = isMine ? s.Student.User.Email : null,
+                SolutionText = s.SolutionText,
+                PhotoUrl = s.SolutionPhotoKey,
+                SubmittedAt = s.SubmittedAt,
+                IsPublished = s.IsPublished,
+                IsMine = isMine
+            })
+            .ToListAsync();
+
+    private static Task<List<SubmissionResponseDto>> ProjectContestSubmissions(
+        IQueryable<ProblemStudent> query, bool isMine) =>
+        query
+            .OrderByDescending(s => s.SubmittedAt)
+            .Select(s => new SubmissionResponseDto
+            {
+                Id = s.Id,
+                ProblemId = s.ProblemId,
+                StudentId = s.StudentId,
+                StudentName = s.Student.User.FirstName + " " + s.Student.User.LastName,
+                StudentEmail = isMine ? s.Student.User.Email : null,
+                SolutionText = s.SubmittedSolutionText,
+                PhotoUrl = s.SubmittedSolutionPhotoKey,
+                Grade = s.Score,
+                Feedback = isMine ? s.Feedback : null,
+                GradedAt = s.GradedAt,
+                SubmittedAt = s.SubmittedAt,
+                IsPublished = s.IsPublished,
+                IsMine = isMine
+            })
+            .ToListAsync();
 
     // Returns the current student's own DRAFT submissions for a problem
     // (bank + contest). Strict studentId scope — never returns another
