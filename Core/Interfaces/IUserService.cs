@@ -8,9 +8,11 @@ namespace MIO.Core.Interfaces
 {
     public interface IUserService
     {
-        Task<User?> CreateUser(CreateUserDTO userDTO);
+        Task<CreatedUserResult> CreateUser(CreateUserDTO userDTO);
 
-        Task<User?> RegisterStudent(CreateUserDTO userDTO);
+        Task<CreatedUserResult> RegisterUser(CreateUserDTO userDTO);
+
+        Task<IEnumerable<ApprovalResponseDTO>> GetApprovalsService();
 
         //Task<bool> IsUserExist(AuthenticationRequest request);
 

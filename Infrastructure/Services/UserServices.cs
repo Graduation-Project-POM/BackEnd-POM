@@ -23,11 +23,13 @@ namespace MIO.Infrastructure.Services
             _currentUser = currentUser;
         }
 
-        public async Task<User?> CreateUser(CreateUserDTO userDTO)
+        public async Task<CreatedUserResult> CreateUser(CreateUserDTO userDTO)
         {
             var userName = await ResolveUserName(userDTO);
+            var phoneNumber = await ResolvePhoneNumber(userDTO.PhoneNumber);
+            var (password, generatedPassword) = ResolvePassword(userDTO);
 
-            Security.CreatePasswordHash(userDTO.Password, out byte[] passwordHash, out byte[] passwordSalt);
+            Security.CreatePasswordHash(password, out byte[] passwordHash, out byte[] passwordSalt);
 
             var user = new User
             {
@@ -38,7 +40,7 @@ namespace MIO.Infrastructure.Services
                 UserName = userName,
                 PasswordHash = passwordHash,
                 PasswordSalt = passwordSalt,
-                PhoneNumber = userDTO.PhoneNumber,
+                PhoneNumber = phoneNumber,
                 Gender = userDTO.Gender,
                 ProfileImageUrl = userDTO.ProfileImageUrl,
                 IsActive = userDTO.IsActive ?? true,
@@ -48,9 +50,50 @@ namespace MIO.Infrastructure.Services
             };
 
             _dbContext.Users.Add(user);
-            await _dbContext.SaveChangesAsync();
+            await SaveUserChangesAsync();
             await EnsureRoleProfile(user);
-            return user;
+            return new CreatedUserResult { User = user, GeneratedPassword = generatedPassword };
+        }
+
+        // Password for a new account: the one supplied, or a secure random one
+        // when it was left empty. The generated value is returned so it can be
+        // shown to whoever created the account; only its hash is stored.
+        private static (string Password, string? Generated) ResolvePassword(CreateUserDTO userDTO)
+        {
+            if (!string.IsNullOrEmpty(userDTO.Password))
+                return (userDTO.Password, null);
+
+            var generated = Security.GenerateRandomPassword();
+            return (generated, generated);
+        }
+
+        // Normalized phone number, or null when none was given. Every account's
+        // phone number must be unique; exceptUserId skips the account being edited.
+        private async Task<string?> ResolvePhoneNumber(string? phoneNumber, int? exceptUserId = null)
+        {
+            var normalized = PhoneNumbers.Normalize(phoneNumber);
+            if (normalized != null &&
+                await _dbContext.Users.AnyAsync(u => u.PhoneNumber == normalized && u.Id != exceptUserId))
+                throw PhoneNumberInUse();
+            return normalized;
+        }
+
+        private static AppException PhoneNumberInUse() =>
+            new("PHONE_EXISTS", "This phone number is already registered to another account", StatusCodes.Status409Conflict);
+
+        // SaveChanges for writes that set a phone number. The pre-check above
+        // can't stop two simultaneous requests for the same number; the unique
+        // index does, and this turns that rejection into the same friendly error.
+        private async Task SaveUserChangesAsync()
+        {
+            try
+            {
+                await _dbContext.SaveChangesAsync();
+            }
+            catch (DbUpdateException ex) when (PhoneNumbers.IsDuplicatePhone(ex))
+            {
+                throw PhoneNumberInUse();
+            }
         }
 
         // Use the supplied username if any (public sign-up); otherwise generate
@@ -95,9 +138,9 @@ namespace MIO.Infrastructure.Services
 
         // Ensure a user with the Student/Trainer role has the matching entity row,
         // so they appear in GET /Student and GET /Trainer (and can join groups).
-        // studentAccepted: admin-created students are accepted immediately;
-        // public self-registrations start pending so an admin approves them.
-        private async Task EnsureRoleProfile(User user, bool studentAccepted = true)
+        // accepted: admin-created accounts are accepted immediately; public
+        // self-registrations start pending so an admin approves them.
+        private async Task EnsureRoleProfile(User user, bool accepted = true)
         {
             if (user.RoleID == Role.Student &&
                 !await _dbContext.Students.AnyAsync(s => s.UserId == user.Id))
@@ -109,7 +152,7 @@ namespace MIO.Infrastructure.Services
                     City = "",
                     SchoolName = "",
                     NationalId = "",
-                    IsAccepted = studentAccepted
+                    IsAccepted = accepted
                 });
                 await _dbContext.SaveChangesAsync();
             }
@@ -119,17 +162,27 @@ namespace MIO.Infrastructure.Services
                 _dbContext.Trainers.Add(new Trainer
                 {
                     UserId = user.Id,
-                    Specialization = ""
+                    Specialization = "",
+                    IsAccepted = accepted
                 });
                 await _dbContext.SaveChangesAsync();
             }
         }
 
-        public async Task<User?> RegisterStudent(CreateUserDTO userDTO)
-        {
-            var userName = await ResolveUserName(userDTO);
+        // Roles that may sign themselves up. Admin accounts are only created by
+        // an existing admin, so a public form can never request admin rights.
+        private static readonly Role[] SelfRegisterRoles = [Role.Student, Role.Trainer];
 
-            Security.CreatePasswordHash(userDTO.Password, out byte[] passwordHash, out byte[] passwordSalt);
+        public async Task<CreatedUserResult> RegisterUser(CreateUserDTO userDTO)
+        {
+            if (!SelfRegisterRoles.Contains(userDTO.RoleID))
+                throw new AppException("INVALID_ROLE", "You can only sign up as a student or a trainer", StatusCodes.Status400BadRequest);
+
+            var userName = await ResolveUserName(userDTO);
+            var phoneNumber = await ResolvePhoneNumber(userDTO.PhoneNumber);
+            var (password, generatedPassword) = ResolvePassword(userDTO);
+
+            Security.CreatePasswordHash(password, out byte[] passwordHash, out byte[] passwordSalt);
 
             var user = new User
             {
@@ -140,20 +193,20 @@ namespace MIO.Infrastructure.Services
                 UserName = userName,
                 PasswordHash = passwordHash,
                 PasswordSalt = passwordSalt,
-                PhoneNumber = userDTO.PhoneNumber,
+                PhoneNumber = phoneNumber,
                 Gender = userDTO.Gender,
                 ProfileImageUrl = userDTO.ProfileImageUrl,
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
                 LastUpdatedAt = DateTime.UtcNow,
-                RoleID = Role.Student
+                RoleID = userDTO.RoleID
             };
 
             _dbContext.Users.Add(user);
-            await _dbContext.SaveChangesAsync();
+            await SaveUserChangesAsync();
             // Public registration → pending until an admin approves on the Approvals page.
-            await EnsureRoleProfile(user, studentAccepted: false);
-            return user;
+            await EnsureRoleProfile(user, accepted: false);
+            return new CreatedUserResult { User = user, GeneratedPassword = generatedPassword };
         }
 
         public async Task<User?> GetUserService(AuthenticationRequest request)
@@ -166,16 +219,18 @@ namespace MIO.Infrastructure.Services
             if (!Security.VerifyPasswordHash(request.Password, user.PasswordHash, user.PasswordSalt))
                 throw new AppException("INVALID_CREDENTIALS", "Invalid username or password", StatusCodes.Status401Unauthorized);
 
-            // Block login for students whose account is still pending admin approval.
-            if (user.RoleID == Role.Student)
+            // Block login for accounts still pending admin approval, whatever the role.
+            var pending = user.RoleID switch
             {
-                var student = await _dbContext.Students.FirstOrDefaultAsync(s => s.UserId == user.Id);
-                if (student != null && !student.IsAccepted)
-                    throw new AppException(
-                        "ACCOUNT_PENDING",
-                        "Your account is pending admin approval",
-                        StatusCodes.Status403Forbidden);
-            }
+                Role.Student => await _dbContext.Students.AnyAsync(s => s.UserId == user.Id && !s.IsAccepted),
+                Role.Trainer => await _dbContext.Trainers.AnyAsync(t => t.UserId == user.Id && !t.IsAccepted),
+                _ => false
+            };
+            if (pending)
+                throw new AppException(
+                    "ACCOUNT_PENDING",
+                    "Your account is pending admin approval",
+                    StatusCodes.Status403Forbidden);
 
             return user;
         }
@@ -228,6 +283,49 @@ namespace MIO.Infrastructure.Services
                 };
 
             return userResponse;
+        }
+
+        // Students and trainers with their approval state, newest first. Each row
+        // carries the role-profile id (used by the accept endpoints and profile
+        // pages) and the user id (used by reject, which deletes the user).
+        public async Task<IEnumerable<ApprovalResponseDTO>> GetApprovalsService()
+        {
+            var students = await _dbContext.Students
+                .Select(s => new ApprovalResponseDTO
+                {
+                    UserId = s.UserId,
+                    ProfileId = s.Id,
+                    Role = "Student",
+                    FirstName = s.User.FirstName,
+                    LastName = s.User.LastName,
+                    Email = s.User.Email,
+                    PhoneNumber = s.User.PhoneNumber,
+                    IsAccepted = s.IsAccepted,
+                    CreatedAt = s.User.CreatedAt,
+                    GradeLevel = s.GradeLevel,
+                })
+                .ToListAsync();
+
+            var trainers = await _dbContext.Trainers
+                .Select(t => new ApprovalResponseDTO
+                {
+                    UserId = t.UserId,
+                    ProfileId = t.Id,
+                    Role = "Trainer",
+                    FirstName = t.User.FirstName,
+                    LastName = t.User.LastName,
+                    Email = t.User.Email,
+                    PhoneNumber = t.User.PhoneNumber,
+                    IsAccepted = t.IsAccepted,
+                    CreatedAt = t.User.CreatedAt,
+                    Specialization = t.Specialization,
+                })
+                .ToListAsync();
+
+            return students.Concat(trainers)
+                .OrderByDescending(a => a.CreatedAt)
+                .ThenByDescending(a => a.UserId)
+                .ToList();
         }
 
         public async Task<IEnumerable<UserResponseDTO>> GetUsersService()
@@ -301,7 +399,7 @@ namespace MIO.Infrastructure.Services
             if (passwordChanged || roleChanged || deactivated)
                 existingUser.RefreshTokenRevokedAt = DateTime.UtcNow;
 
-            await _dbContext.SaveChangesAsync();
+            await SaveUserChangesAsync();
             await EnsureRoleProfile(existingUser);
             return existingUser;
         }
@@ -331,7 +429,7 @@ namespace MIO.Infrastructure.Services
             existingUser.LastName = userDTO.LastName;
             existingUser.Email = userDTO.Email;
             existingUser.UserName = userDTO.UserName;
-            existingUser.PhoneNumber = userDTO.PhoneNumber;
+            existingUser.PhoneNumber = await ResolvePhoneNumber(userDTO.PhoneNumber, id);
             existingUser.Gender = userDTO.Gender;
             existingUser.ProfileImageUrl = userDTO.ProfileImageUrl;
             // The admin form has no bio field; null means "keep", "" clears it.
@@ -348,7 +446,7 @@ namespace MIO.Infrastructure.Services
         public async Task<User?> UpdateCurrentUserService(UpdateUserDTO userDTO)
         {
             var user = await ApplyProfileUpdate(_currentUser.UserId, userDTO);
-            await _dbContext.SaveChangesAsync();
+            await SaveUserChangesAsync();
             return user;
         }
 

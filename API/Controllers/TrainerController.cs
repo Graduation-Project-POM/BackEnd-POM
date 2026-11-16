@@ -65,6 +65,22 @@ namespace MIO.API.Controllers
             });
         }
 
+        [HttpPatch]
+        [Route("{id}/accept")]
+        [Authorize(Roles = "Admin")]
+        public async Task<ActionResult> AcceptTrainer(int id)
+        {
+            if (id <= 0)
+                return BadRequest("Invalid trainer ID");
+
+            var accepted = await trainerService.AcceptTrainerService(id);
+            return Ok(new
+            {
+                message = "Trainer accepted successfully",
+                trainerId = accepted!.Id
+            });
+        }
+
         [HttpGet]
         [Route("{id}")]
         // Profile viewing is open to any authenticated user (View Profile feature).

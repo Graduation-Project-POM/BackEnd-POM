@@ -25,21 +25,28 @@ namespace MIO.API.Controllers
         [Authorize(Roles ="Admin")]
         public async Task<ActionResult> createUser(CreateUserDTO userDTO)
         {  
-              var user=  await userServices.CreateUser(userDTO);
+              var created=  await userServices.CreateUser(userDTO);
               
                 return new OkObjectResult(new
                 {
                     message = "User Created successfully",
-                    userId = user.Id
-                });      
+                    userId = created.User.Id,
+                    // Only set when the admin left the password empty; shown once.
+                    generatedPassword = created.GeneratedPassword
+                });
         }
 
         [HttpPost("register")]
         [AllowAnonymous]
         public async Task<IActionResult> Register(CreateUserDTO dto)
         {
-            var user = await userServices.RegisterStudent(dto);
-            return Ok(new { message = "Account created successfully", userId = user!.Id });
+            var created = await userServices.RegisterUser(dto);
+            return Ok(new
+            {
+                message = "Account created successfully",
+                userId = created.User.Id,
+                generatedPassword = created.GeneratedPassword
+            });
         }
 
         [HttpGet]
@@ -51,6 +58,15 @@ namespace MIO.API.Controllers
             return Ok(records);
         }
 
+
+        // Sign-up requests from every self-registering role (students and
+        // trainers), pending and approved, for the admin Approvals page.
+        [HttpGet("approvals")]
+        [Authorize(Roles ="Admin")]
+        public async Task<ActionResult<IEnumerable<ApprovalResponseDTO>>> GetApprovals()
+        {
+            return Ok(await userServices.GetApprovalsService());
+        }
 
         [HttpGet("me")]
         [Authorize]

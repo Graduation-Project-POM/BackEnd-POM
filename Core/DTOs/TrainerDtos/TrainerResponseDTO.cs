@@ -6,6 +6,7 @@ namespace MIO.Core.DTOs.TrainerDtos
     {
         public int Id { get; set; }
         public string Specialization { get; set; }
+        public bool IsAccepted { get; set; }
         public BasicUserDTO BasicUser { get; set; }
 
     }

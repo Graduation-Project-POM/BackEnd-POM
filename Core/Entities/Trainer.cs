@@ -8,6 +8,9 @@ namespace MIO.Core.Entities
         public int Id { get; set; }
 
         public string Specialization { get; set; }
+        // Self-registered trainers start pending until an admin approves them;
+        // admin-created trainers are accepted immediately.
+        public bool IsAccepted { get; set; } = true;
         public int UserId { get; set; }
         public User User { get; set; }
 

@@ -24,9 +24,11 @@ namespace MIO.Core.DTOs.UserDtos
             public Gender? Gender { get; set; }
 
             public string ProfileImageUrl { get; set; }
-            [Required]
-            [MinLength(8)]
-             public required string Password { get; set; }
+            // Optional: a secure random password is generated when null or "".
+            // RegularExpression skips empty values, so "" isn't rejected; any
+            // password that is supplied still needs at least 8 characters.
+            [RegularExpression(@"^[\s\S]{8,}$", ErrorMessage = "The field Password must be at least 8 characters.")]
+             public string? Password { get; set; }
             [Required]
             [Range(1, 10)] 
              public required Role RoleID { get; set; }

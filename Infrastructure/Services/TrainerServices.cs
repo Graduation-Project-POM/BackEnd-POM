@@ -72,6 +72,7 @@ namespace MIO.Infrastructure.Services
             {
                 Id = trainer.Id,
                 Specialization = trainer.Specialization,
+                IsAccepted = trainer.IsAccepted,
                 BasicUser = new BasicUserDTO
                 {
                     Id = trainer.UserId,
@@ -94,6 +95,7 @@ namespace MIO.Infrastructure.Services
             {
                 Id = trainer.Id,
                 Specialization = trainer.Specialization,
+                IsAccepted = trainer.IsAccepted,
                 BasicUser = new BasicUserDTO
                 {
                     Id = trainer.UserId,
@@ -104,6 +106,18 @@ namespace MIO.Infrastructure.Services
                     PhoneNumber = trainer.User.PhoneNumber,
                 }
             });
+        }
+
+        // Admin approves a self-registered trainer so they can log in.
+        public async Task<Trainer?> AcceptTrainerService(int id)
+        {
+            var trainer = await _dbContext.Trainers.FirstOrDefaultAsync(t => t.Id == id);
+            if (trainer == null)
+                throw new AppException($"Trainer with ID {id} not found", StatusCodes.Status404NotFound);
+
+            trainer.IsAccepted = true;
+            await _dbContext.SaveChangesAsync();
+            return trainer;
         }
 
         public async Task<Trainer?> UpdateTrainerService(int id, UpdateTrainerDTO trainerDTO)
@@ -161,6 +175,7 @@ namespace MIO.Infrastructure.Services
             {
                 Id = trainer.Id,
                 Specialization = trainer.Specialization,
+                IsAccepted = trainer.IsAccepted,
                 BasicUser = new BasicUserDTO
                 {
                     Id = trainer.UserId,
