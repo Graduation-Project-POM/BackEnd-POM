@@ -19,4 +19,9 @@ public class ProblemResponseDTO
 
     public int Points { get; set; }
     public int SolvedCount { get; set; }
+
+    // What deleting the problem would also remove (bank + contest submissions,
+    // and all discussion messages including replies).
+    public int SubmissionCount { get; set; }
+    public int CommentCount { get; set; }
 }

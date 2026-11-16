@@ -7,6 +7,7 @@ using MIO.Core.Entities;
 using MIO.Core.Enums;
 using MIO.Core.Interfaces;
 using MIO.Infrastructure;
+using MIO.Infrastructure.Services;
 using MIO2.Core.Entities;
 using MIO2.Core.Interfaces;
 
@@ -82,7 +83,10 @@ public class ProblemService : IProblemServices
             PublisherName = p.Trainer != null ? p.Trainer.User.FirstName + " " + p.Trainer.User.LastName : null,
             CanModify = isAdmin || (myTrainerId != null && p.TrainerID == myTrainerId),
             Points = p.Points,
-            SolvedCount = p.SolvedCount
+            SolvedCount = p.SolvedCount,
+            SubmissionCount = _context.ProblemBankSubmissions.Count(s => s.ProblemId == p.ID)
+                            + _context.ProblemStudents.Count(s => s.ProblemId == p.ID),
+            CommentCount = _context.ProblemComments.Count(c => c.ProblemId == p.ID)
         }).ToListAsync();
 
         return rows.Select(r => new ProblemResponseDTO
@@ -99,7 +103,9 @@ public class ProblemService : IProblemServices
             PublisherName = r.PublisherName,
             CanModify = r.CanModify,
             Points = r.Points,
-            SolvedCount = r.SolvedCount
+            SolvedCount = r.SolvedCount,
+            SubmissionCount = r.SubmissionCount,
+            CommentCount = r.CommentCount
         });
     }
 
@@ -264,10 +270,7 @@ public class ProblemService : IProblemServices
 
         await _context.SaveChangesAsync();
 
-        // "Solved" = passing score: Score is at least half of the problem's
-        // Points (integer-safe via Score*2 >= Points).
-        problem.SolvedCount = await _context.ProblemStudents
-            .CountAsync(ps => ps.ProblemId == problem.ID && ps.Score != null && ps.Score * 2 >= problem.Points);
+        await _context.RecomputeProblemSolvedAsync(problem.ID);
         await _context.SaveChangesAsync();
         return true;
     }
@@ -296,7 +299,22 @@ public class ProblemService : IProblemServices
         }
 
 
+        // Students who submitted to this problem lose it from their solved count.
+        var affectedStudentIds = await _context.ProblemBankSubmissions
+            .Where(s => s.ProblemId == id).Select(s => s.StudentId)
+            .Union(_context.ProblemStudents.Where(s => s.ProblemId == id).Select(s => s.StudentId))
+            .ToListAsync();
+        var affectedContestIds = await _context.Contests
+            .Where(c => c.Problems.Any(p => p.ID == id))
+            .Select(c => c.Id)
+            .ToListAsync();
+
         _context.Problems.Remove(problem);
+        await _context.SaveChangesAsync();
+
+        foreach (var studentId in affectedStudentIds.Distinct())
+            await _context.RecomputeStudentSolvedAsync(studentId);
+        await _context.RecomputeContestSolvedAsync(affectedContestIds);
         await _context.SaveChangesAsync();
 
         return true;
@@ -350,6 +368,9 @@ public class ProblemService : IProblemServices
         };
 
         _context.ProblemStudents.Add(submission);
+        await _context.SaveChangesAsync();
+
+        await RecomputeAggregatesAsync(problemId, student.Id);
         await _context.SaveChangesAsync();
 
         return new SubmitSolutionResponseDto
@@ -490,15 +511,12 @@ public class ProblemService : IProblemServices
                 StatusCodes.Status403Forbidden);
     }
 
+    // Recomputes every counter affected by a student's submission to a problem
+    // changing (submitted, deleted, or graded). "Solved" counts submitted
+    // solutions — see SolvedCounters.
     private async Task RecomputeAggregatesAsync(int problemId, int studentId)
     {
-        var problem = await _context.Problems.FindAsync(problemId);
-        if (problem != null)
-        {
-            // "Solved" = Score is at least half of Points (Score*2 >= Points).
-            problem.SolvedCount = await _context.ProblemStudents
-                .CountAsync(ps => ps.ProblemId == problemId && ps.Score != null && ps.Score * 2 >= problem.Points);
-        }
+        await _context.RecomputeProblemSolvedAsync(problemId);
 
         var student = await _context.Students.FindAsync(studentId);
         if (student != null)
@@ -508,8 +526,7 @@ public class ProblemService : IProblemServices
                 .Where(ps => ps.StudentId == studentId && ps.Score != null)
                 .SumAsync(ps => (int?)ps.Score) ?? 0;
 
-            student.ProblemSolved = await _context.ProblemStudents
-                .CountAsync(ps => ps.StudentId == studentId && ps.Score != null && ps.Score * 2 >= ps.Problem.Points);
+            await _context.RecomputeStudentSolvedAsync(studentId);
         }
 
         // Per-contest leaderboard score: every contest that contains this problem
@@ -533,11 +550,7 @@ public class ProblemService : IProblemServices
                              ps.Score != null)
                 .SumAsync(ps => (int?)ps.Score) ?? 0;
 
-            cs.ProblemSolved = await _context.ProblemStudents
-                .CountAsync(ps => ps.StudentId == studentId &&
-                                  contestProblemIds.Contains(ps.ProblemId) &&
-                                  ps.Score != null &&
-                                  ps.Score * 2 >= ps.Problem.Points);
+            cs.ProblemSolved = await _context.CountContestProblemsSubmittedAsync(studentId, contestProblemIds);
         }
     }
 
@@ -598,6 +611,9 @@ public class ProblemService : IProblemServices
         };
 
         _context.ProblemBankSubmissions.Add(submission);
+        await _context.SaveChangesAsync();
+
+        await RecomputeAggregatesAsync(problemId, student.Id);
         await _context.SaveChangesAsync();
 
         return new BankSubmissionResponseDto
@@ -1097,6 +1113,9 @@ public class ProblemService : IProblemServices
 
         _context.ProblemBankSubmissions.Remove(submission);
         await _context.SaveChangesAsync();
+
+        await RecomputeAggregatesAsync(submission.ProblemId, submission.StudentId);
+        await _context.SaveChangesAsync();
     }
 
     public async Task SetBankSubmissionVisibility(int submissionId, bool isPublished)
@@ -1124,6 +1143,9 @@ public class ProblemService : IProblemServices
             throw new AppException("You can only delete your own submissions", StatusCodes.Status403Forbidden);
 
         _context.ProblemStudents.Remove(submission);
+        await _context.SaveChangesAsync();
+
+        await RecomputeAggregatesAsync(submission.ProblemId, submission.StudentId);
         await _context.SaveChangesAsync();
     }
 

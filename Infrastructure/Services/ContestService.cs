@@ -125,6 +125,7 @@ public class ContestService:IContestService
                 .Select(ps => new SeedSubmission
                 {
                     StudentId = ps.StudentId,
+                    ProblemId = ps.ProblemId,
                     Score = ps.Score,
                     Points = ps.Problem.Points
                 })
@@ -141,9 +142,8 @@ public class ContestService:IContestService
             if (subsByStudent.TryGetValue(s.Id, out var rows))
             {
                 score = rows.Where(r => r.Score != null).Sum(r => r.Score!.Value);
-                // Pass mark: Score must reach at least half of the problem's
-                // points (Score*2 >= Points keeps the comparison integer-safe).
-                solved = rows.Count(r => r.Score != null && r.Score.Value * 2 >= r.Points);
+                // "Solved" = submitted a solution (see SolvedCounters); one per problem.
+                solved = rows.Select(r => r.ProblemId).Distinct().Count();
             }
             return new ContestStudent
             {
@@ -522,6 +522,13 @@ public class ContestService:IContestService
 
         await _dbContext.SaveChangesAsync();
 
+        // The contest's problem set changed, so each participant's solved count may too.
+        if (dto.ProblemIds != null)
+        {
+            await _dbContext.RecomputeContestSolvedAsync([contest.Id]);
+            await _dbContext.SaveChangesAsync();
+        }
+
         // Problems created inside a contest (not bank problems) only exist for
         // that contest. Once unlinked they are unreachable from the UI but would
         // still hold their title, blocking a new problem with the same name.
@@ -588,13 +595,25 @@ public class ContestService:IContestService
 
         if (orphans.Count == 0) return;
 
+        var orphanIds = orphans.Select(p => p.ID).ToList();
+        var affectedStudentIds = await _dbContext.ProblemBankSubmissions
+            .Where(s => orphanIds.Contains(s.ProblemId)).Select(s => s.StudentId)
+            .Union(_dbContext.ProblemStudents.Where(s => orphanIds.Contains(s.ProblemId)).Select(s => s.StudentId))
+            .ToListAsync();
+
         _dbContext.Problems.RemoveRange(orphans);
+        await _dbContext.SaveChangesAsync();
+
+        // Their submissions are gone, so those students' solved counts drop.
+        foreach (var studentId in affectedStudentIds.Distinct())
+            await _dbContext.RecomputeStudentSolvedAsync(studentId);
         await _dbContext.SaveChangesAsync();
     }
 
     private sealed class SeedSubmission
     {
         public int StudentId { get; set; }
+        public int ProblemId { get; set; }
         public int? Score { get; set; }
         public int Points { get; set; }
     }
