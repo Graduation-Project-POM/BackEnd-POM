@@ -64,6 +64,7 @@ public class ContestService:IContestService
             Description = createContestDTO.Description,
             TrainerId = trainerId,
             Status = createContestDTO.Status,
+            Difficulty = createContestDTO.Difficulty,
             Problems = problems,
             StartAt = createContestDTO.StartAt,
             EndAt = createContestDTO.EndAt
@@ -192,6 +193,7 @@ public class ContestService:IContestService
                 Title = c.Title,
                 Description = c.Description,
                 Status = c.Status,
+                Difficulty = c.Difficulty,
                 StartAt = c.StartAt,
                 EndAt = c.EndAt,
                 TrainerId = c.TrainerId ?? 0,
@@ -223,6 +225,7 @@ public class ContestService:IContestService
                 Title = c.Title,
                 Description = c.Description,
                 Status = c.Status,
+                Difficulty = c.Difficulty,
                 StartAt = c.StartAt,
                 EndAt = c.EndAt,
                 TrainerId = c.TrainerId ?? 0,
@@ -515,6 +518,9 @@ public class ContestService:IContestService
         if (dto.Status.HasValue)
             contest.Status = dto.Status.Value;
 
+        if (dto.Difficulty.HasValue)
+            contest.Difficulty = dto.Difficulty.Value;
+
         if (dto.StartAt.HasValue)
             contest.StartAt = dto.StartAt.Value;
 
@@ -579,6 +585,7 @@ public class ContestService:IContestService
             Title = contest.Title,
             Description = contest.Description,
             Status = contest.Status,
+            Difficulty = contest.Difficulty,
             StartAt = contest.StartAt,
             EndAt = contest.EndAt,
             TrainerId = contest.TrainerId ?? 0,
