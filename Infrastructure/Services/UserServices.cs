@@ -169,14 +169,12 @@ namespace MIO.Infrastructure.Services
             }
         }
 
-        // Roles that may sign themselves up. Admin accounts are only created by
-        // an existing admin, so a public form can never request admin rights.
-        private static readonly Role[] SelfRegisterRoles = [Role.Student, Role.Trainer];
-
+        // Public sign-up is for students only. Trainer and admin accounts are
+        // created by an admin, so the public form can never request those roles.
         public async Task<CreatedUserResult> RegisterUser(CreateUserDTO userDTO)
         {
-            if (!SelfRegisterRoles.Contains(userDTO.RoleID))
-                throw new AppException("INVALID_ROLE", "You can only sign up as a student or a trainer", StatusCodes.Status400BadRequest);
+            if (userDTO.RoleID != Role.Student)
+                throw new AppException("INVALID_ROLE", "Only students can sign up", StatusCodes.Status400BadRequest);
 
             var userName = await ResolveUserName(userDTO);
             var phoneNumber = await ResolvePhoneNumber(userDTO.PhoneNumber);
@@ -285,7 +283,7 @@ namespace MIO.Infrastructure.Services
             return userResponse;
         }
 
-        // Students and trainers with their approval state, newest first. Each row
+        // Student sign-up requests with their approval state, newest first. Each row
         // carries the role-profile id (used by the accept endpoints and profile
         // pages) and the user id (used by reject, which deletes the user).
         public async Task<IEnumerable<ApprovalResponseDTO>> GetApprovalsService()
@@ -306,7 +304,10 @@ namespace MIO.Infrastructure.Services
                 })
                 .ToListAsync();
 
+            // Trainers are created by an admin (already accepted), so only list
+            // any still-pending trainer requests left from older self sign-ups.
             var trainers = await _dbContext.Trainers
+                .Where(t => !t.IsAccepted)
                 .Select(t => new ApprovalResponseDTO
                 {
                     UserId = t.UserId,
