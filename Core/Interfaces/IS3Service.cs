@@ -12,5 +12,6 @@ namespace MIO2.Core.Interfaces
         Task<bool> IsMediaExists(string key);
         string GetPublicUrl(string key);
         Task<bool> DeleteMediaAsync(string key);
+        Task<string> UploadPublicAsync(Stream content, string key, string contentType);
     }
 }

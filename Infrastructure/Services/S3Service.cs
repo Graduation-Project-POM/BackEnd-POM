@@ -147,6 +147,34 @@ namespace MIO2.Infrastructure.Services
             }
         }
 
+        // Uploads a file from the server side and returns its public URL.
+        // Public read access comes from the bucket policy, not from object ACLs.
+        public async Task<string> UploadPublicAsync(Stream content, string key, string contentType)
+        {
+            if (string.IsNullOrWhiteSpace(key))
+                throw new AppException("FileKey is required.", StatusCodes.Status400BadRequest);
+
+            try
+            {
+                await _s3.PutObjectAsync(new PutObjectRequest
+                {
+                    BucketName = _bucket,
+                    Key = key,
+                    InputStream = content,
+                    ContentType = contentType,
+                    AutoCloseStream = false
+                });
+            }
+            catch (Amazon.S3.AmazonS3Exception ex)
+            {
+                throw new AppException(
+                    $"Failed to upload object to S3: {ex.Message}",
+                    StatusCodes.Status500InternalServerError);
+            }
+
+            return GetPublicUrl(key);
+        }
+
         public string GetPublicUrl(string key)
         {
             return $"https://{_bucket}.s3.{_regionSystemName}.amazonaws.com/{key}";

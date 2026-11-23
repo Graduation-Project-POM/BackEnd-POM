@@ -161,6 +161,14 @@ using (var scope = app.Services.CreateScope())
     }
 }
 
+// Opt-in demo data: `dotnet run -- --seed-demo` seeds and exits (local databases only
+// unless --allow-remote is also passed). Normal startup never runs it.
+if (args.Contains("--seed-demo"))
+{
+    await MIO.Infrastructure.Seeding.DemoDataSeeder.RunAsync(app.Services, args.Contains("--allow-remote"), app.Logger);
+    return;
+}
+
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

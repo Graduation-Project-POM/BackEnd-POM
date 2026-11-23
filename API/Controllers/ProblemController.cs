@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using MIO.Core.DTOs.ProblemDTOs;
@@ -10,12 +10,12 @@ using MIO2.Core.Interfaces;
 public class ProblemsController : ControllerBase
 {
     private readonly IProblemServices _Problemservice;
-    private readonly IWebHostEnvironment _env;
+    private readonly IS3Service _s3Service;
 
-    public ProblemsController(IProblemServices problemservice, IWebHostEnvironment env)
+    public ProblemsController(IProblemServices problemservice, IS3Service s3Service)
     {
         _Problemservice = problemservice;
-        _env = env;
+        _s3Service = s3Service;
     }
 
 
@@ -36,18 +36,11 @@ public class ProblemsController : ControllerBase
         if (!allowed.Contains(ext))
             return BadRequest(new { message = "Unsupported image type. Use PNG, JPG, GIF or WEBP." });
 
-      
-        var uploadsDir = Path.Combine(_env.ContentRootPath, "wwwroot", "uploads");
-        Directory.CreateDirectory(uploadsDir);
+        var key = $"uploads/{Guid.NewGuid():N}{ext}";
+        await using var stream = file.OpenReadStream();
+        var url = await _s3Service.UploadPublicAsync(stream, key, file.ContentType);
 
-        var fileName = $"{Guid.NewGuid():N}{ext}";
-        var fullPath = Path.Combine(uploadsDir, fileName);
-        await using (var stream = System.IO.File.Create(fullPath))
-        {
-            await file.CopyToAsync(stream);
-        }
-
-        return Ok(new { url = $"/uploads/{fileName}" });
+        return Ok(new { url });
     }
     // public ProblemsController(IProblemServices problemservice,IS3Service s3Service)
     // {
