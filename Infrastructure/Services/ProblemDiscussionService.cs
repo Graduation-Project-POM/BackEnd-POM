@@ -47,10 +47,18 @@ public class ProblemDiscussionService : IProblemDiscussionService
 
         var ownsProblem = myTrainerId != null && problem.TrainerID == myTrainerId;
 
-        if (!problem.IsBankProblem && !isAdmin && !ownsProblem) throw notFound;
+        // Same rule as ProblemService.GetById: a trainer whose group has a contest
+        // containing this problem can read it, even if another user created it.
+        var managesContainingContest = myTrainerId != null && await _context.Contests
+            .AnyAsync(c => c.Problems.Any(p => p.ID == problemId) &&
+                           (c.TrainerId == myTrainerId ||
+                            _context.GroupContests.Any(gc => gc.ContestId == c.Id && gc.Group.TrainerId == myTrainerId)));
+        var trainerCanSee = ownsProblem || managesContainingContest;
+
+        if (!problem.IsBankProblem && !isAdmin && !trainerCanSee) throw notFound;
         if (role == "Student" && !problem.IsPublished) throw notFound;
-        if (role == "Trainer" && !problem.IsPublished && !ownsProblem) throw notFound;
-        if (!problem.IsBankVisible && !isAdmin && !ownsProblem) throw notFound;
+        if (role == "Trainer" && !problem.IsPublished && !trainerCanSee) throw notFound;
+        if (!problem.IsBankVisible && !isAdmin && !trainerCanSee) throw notFound;
     }
 
     private ProblemCommentDto ToDto(ProblemComment c) => new()

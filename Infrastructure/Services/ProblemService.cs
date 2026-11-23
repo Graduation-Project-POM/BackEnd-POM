@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MIO.API.Settings;
@@ -165,7 +165,7 @@ public class ProblemService : IProblemServices
         if (!p.IsBankVisible)
         {
             var ownsProblem = myTrainerId != null && p.TrainerID == myTrainerId;
-            if (!isAdmin && !ownsProblem)
+            if (!isAdmin && !ownsProblem && !managesContainingContest)
                 throw new AppException(
                     $"Problem with ID {id} not found",
                     StatusCodes.Status404NotFound);
@@ -246,9 +246,8 @@ public class ProblemService : IProblemServices
                 StatusCodes.Status404NotFound);
         }
 
-        // Admins can edit any problem. A trainer can edit a problem they created,
-        // or one in a contest they manage (created it, or it belongs to a group
-        // they lead), even when the problem was created by someone else.
+        // Admins can edit any problem. A trainer can edit only problems they created;
+        // problems created by others (e.g. in a contest assigned to their group) are read-only.
         if (_currentUser.Role == "Trainer")
         {
             var trainerId = await _context.Trainers
@@ -256,11 +255,11 @@ public class ProblemService : IProblemServices
                 .Select(t => (int?)t.Id)
                 .FirstOrDefaultAsync();
             var owns = trainerId != null && problem.TrainerID == trainerId;
-            if (!owns && !await TrainerManagesContestContainingAsync(id, trainerId))
+            if (!owns)
             {
                 throw new AppException(
                     "FORBIDDEN",
-                    "You can only edit problems you created or problems in contests you manage.",
+                    "You can only edit problems you created.",
                     StatusCodes.Status403Forbidden);
             }
         }

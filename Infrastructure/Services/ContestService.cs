@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MIO.API.Settings;
 using MIO.Core.DTOs.ContestDTOs;
@@ -284,12 +284,25 @@ public class ContestService:IContestService
         if (!exists)
             throw new AppException($"Contest with ID {contestId} not found", StatusCodes.Status404NotFound);
 
+        // Only an admin or the trainer who created a problem may edit it; other
+        // trainers who can see the contest get read-only access.
+        var isAdmin = _currentUser.Role == "Admin";
+        int? myTrainerId = null;
+        if (_currentUser.Role == "Trainer")
+        {
+            myTrainerId = await _dbContext.Trainers
+                .Where(t => t.UserId == _currentUser.UserId)
+                .Select(t => (int?)t.Id)
+                .FirstOrDefaultAsync();
+        }
+
         return await _dbContext.Contests
             .Where(c => c.Id == contestId)
             .SelectMany(c => c.Problems)
             .Select(p => new ProblemResponseDTO
             {
                 ID = p.ID,
+                CanModify = isAdmin || (myTrainerId != null && p.TrainerID == myTrainerId),
                 Title = p.Title,
                 Difficulty = p.Difficulty,
                 Topic = p.Topic,
