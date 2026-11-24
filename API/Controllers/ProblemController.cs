@@ -11,11 +11,16 @@ public class ProblemsController : ControllerBase
 {
     private readonly IProblemServices _Problemservice;
     private readonly IS3Service _s3Service;
+    private readonly IWebHostEnvironment _env;
+    private readonly ILogger<ProblemsController> _logger;
 
-    public ProblemsController(IProblemServices problemservice, IS3Service s3Service)
+    public ProblemsController(IProblemServices problemservice, IS3Service s3Service,
+                              IWebHostEnvironment env, ILogger<ProblemsController> logger)
     {
         _Problemservice = problemservice;
         _s3Service = s3Service;
+        _env = env;
+        _logger = logger;
     }
 
 
@@ -36,11 +41,36 @@ public class ProblemsController : ControllerBase
         if (!allowed.Contains(ext))
             return BadRequest(new { message = "Unsupported image type. Use PNG, JPG, GIF or WEBP." });
 
-        var key = $"uploads/{Guid.NewGuid():N}{ext}";
-        await using var stream = file.OpenReadStream();
-        var url = await _s3Service.UploadPublicAsync(stream, key, file.ContentType);
+        var contentType = string.IsNullOrWhiteSpace(file.ContentType) ? "application/octet-stream" : file.ContentType;
+        if (!contentType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+            return BadRequest(new { message = "Unsupported image type. Use PNG, JPG, GIF or WEBP." });
 
-        return Ok(new { url });
+        var key = $"uploads/{Guid.NewGuid():N}{ext}";
+
+        if (_s3Service.IsConfigured)
+        {
+            try
+            {
+                await using var s3Stream = file.OpenReadStream();
+                var s3Url = await _s3Service.UploadPublicAsync(s3Stream, key, contentType);
+                return Ok(new { url = s3Url });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "S3 upload failed for {Key}; falling back to local storage.", key);
+            }
+        }
+
+        // Local fallback: wwwroot/uploads is served as static files by Program.cs.
+        var webRoot = _env.WebRootPath ?? Path.Combine(_env.ContentRootPath, "wwwroot");
+        var localPath = Path.Combine(webRoot, key.Replace('/', Path.DirectorySeparatorChar));
+        Directory.CreateDirectory(Path.GetDirectoryName(localPath)!);
+        await using (var fs = System.IO.File.Create(localPath))
+        {
+            await file.CopyToAsync(fs);
+        }
+
+        return Ok(new { url = "/" + key });
     }
     // public ProblemsController(IProblemServices problemservice,IS3Service s3Service)
     // {

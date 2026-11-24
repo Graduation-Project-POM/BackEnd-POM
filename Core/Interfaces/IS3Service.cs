@@ -7,6 +7,9 @@ namespace MIO2.Core.Interfaces
 
         
 
+        // False when AWS credentials are missing or still placeholders.
+        bool IsConfigured { get; }
+
         string GenerateSignedUrl(string fileKey);
         (string fileKey,string preSignedUrl) CreateUploadURL(string fileName, string contentType,MediaCategory category, long size);
         Task<bool> IsMediaExists(string key);

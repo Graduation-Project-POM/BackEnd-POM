@@ -17,6 +17,13 @@ namespace MIO2.Infrastructure.Services
         private readonly string _bucket;
         private readonly string _regionSystemName;
         private readonly S3Settings _settings;
+
+        public bool IsConfigured =>
+            !string.IsNullOrWhiteSpace(_settings.AccessKey) &&
+            !string.IsNullOrWhiteSpace(_settings.SecretKey) &&
+            !string.IsNullOrWhiteSpace(_settings.BucketName) &&
+            !_settings.AccessKey.StartsWith("dummy", StringComparison.OrdinalIgnoreCase) &&
+            !_settings.SecretKey.StartsWith("dummy", StringComparison.OrdinalIgnoreCase);
         public S3Service(IOptions<S3Settings>options)
         {
             _settings = options.Value;  
