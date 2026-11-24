@@ -44,7 +44,7 @@ internal sealed record SeedComment(string Key, string ProblemKey, string AuthorK
 
 internal static class DemoSeedContent
 {
-    public const string DemoPassword = "Pmo@Demo2026";
+    public const string DemoPassword = "waed1234";
 
     // ───────────────────────────── Users ─────────────────────────────
 

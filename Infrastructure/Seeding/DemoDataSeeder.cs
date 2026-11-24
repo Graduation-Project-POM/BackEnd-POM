@@ -13,20 +13,8 @@ using MIO2.Core.Entities;
 
 namespace MIO.Infrastructure.Seeding;
 
-/// <summary>
-/// Opt-in demo data seeder (run with: dotnet run -- --seed-demo).
-///
-/// - Insert-only: never updates or deletes existing rows. Every record is looked up
-///   by a natural key (email, group name, contest title, problem title, ...) first,
-///   so running it again adds nothing.
-/// - Refuses to run against a non-local SQL Server unless --allow-remote is passed.
-/// - Counters (solved counts, total points, contest scores) are recomputed with the
-///   same rules the application uses, for the seeded records only.
-/// </summary>
 public static class DemoDataSeeder
 {
-    // Outcome per position in a contest's rotated member list:
-    // 0 = full solution, 1 = full (minor issue), 2 = partial, 3 = weak attempt, -1 = no submission.
     private static readonly int[] EasyOutcomes = [0, 1, 0, 2, 1, 3, -1, 2];
     private static readonly int[] MediumOutcomes = [0, 2, 1, 3, 2, -1, 3, -1];
     private static readonly int[] HardOutcomes = [0, 2, 1, 3, -1, -1, -1, 3];
@@ -78,8 +66,9 @@ public static class DemoDataSeeder
             return user;
         }
 
+        var systemAdmin = await db.Users.FirstOrDefaultAsync(u => u.UserName == "admin" && u.RoleID == Role.Admin);
         foreach (var a in DemoSeedContent.Admins)
-            userIds[a.Key] = (await EnsureUser(a, Role.Admin)).Id;
+            userIds[a.Key] = systemAdmin?.Id ?? (await EnsureUser(a, Role.Admin)).Id;
 
         foreach (var t in DemoSeedContent.Trainers)
         {
@@ -115,7 +104,6 @@ public static class DemoDataSeeder
             studentIds[s.User.Key] = student.Id;
         }
 
-        // ── Groups & enrollments ──
         var groups = new Dictionary<string, Group>();
         foreach (var g in DemoSeedContent.Groups)
         {
@@ -140,7 +128,6 @@ public static class DemoDataSeeder
         }
         await db.SaveChangesAsync();
 
-        // ── Problems ──
         var problems = new Dictionary<string, Problem>();
         var seedProblems = new Dictionary<string, SeedProblem>();
 
@@ -173,7 +160,6 @@ public static class DemoDataSeeder
             problems[bp.Key] = await EnsureProblem(bp, true, now.AddDays(-(64 - i * 3)));
         }
 
-        // ── Contests ──
         var contests = new List<(SeedContest Seed, Contest Entity)>();
         foreach (var sc in DemoSeedContent.Contests)
         {
@@ -197,7 +183,6 @@ public static class DemoDataSeeder
                 {
                     Title = sc.Title, Description = Bidi(sc.Description), TrainerId = group.TrainerId,
                     Difficulty = sc.Difficulty, StartAt = startAt, EndAt = endAt, Problems = contestProblems,
-                    // Stored for completeness; the UI derives the status from the dates.
                     Status = now < startAt ? ContestStatus.Upcoming : now <= endAt ? ContestStatus.Running : ContestStatus.Ended,
                 };
                 db.Contests.Add(contest);
@@ -218,11 +203,10 @@ public static class DemoDataSeeder
             contests.Add((sc, contest));
         }
 
-        // ── Contest submissions & grading ──
         for (var ci = 0; ci < contests.Count; ci++)
         {
             var (sc, contest) = contests[ci];
-            if (now < contest.StartAt) continue; // upcoming: nothing submitted yet
+            if (now < contest.StartAt) continue; 
 
             var ended = now > contest.EndAt;
             var running = !ended;
@@ -258,7 +242,6 @@ public static class DemoDataSeeder
                     {
                         ProblemId = problem.ID, StudentId = sid,
                         SubmittedSolutionText = Bidi(variant.Text), SubmittedAt = submittedAt,
-                        // Grading is only possible after the contest ends (same rule as the API).
                         Score = ended ? variant.Score : null,
                         Feedback = ended ? Bidi(variant.Feedback) : null,
                         GradedAt = ended ? contest.EndAt.AddDays(1).AddMinutes(35 * r + 10 * pi) : null,
@@ -270,7 +253,6 @@ public static class DemoDataSeeder
             await db.SaveChangesAsync();
         }
 
-        // ── Contest enrollments (ContestStudents) ──
         foreach (var (sc, contest) in contests)
         {
             foreach (var key in DemoSeedContent.Groups.Single(g => g.Key == sc.GroupKey).StudentKeys)
@@ -283,7 +265,6 @@ public static class DemoDataSeeder
         }
         await db.SaveChangesAsync();
 
-        // ── Problem bank submissions ──
         foreach (var bs in DemoSeedContent.BankSubmissions)
         {
             var problem = problems[bs.ProblemKey];
@@ -299,7 +280,6 @@ public static class DemoDataSeeder
         }
         await db.SaveChangesAsync();
 
-        // ── Discussions ──
         var commentIds = new Dictionary<string, int>();
         for (var i = 0; i < DemoSeedContent.Comments.Length; i++)
         {
@@ -324,7 +304,6 @@ public static class DemoDataSeeder
             commentIds[c.Key] = existing.Id;
         }
 
-        // ── Counters (same formulas as ProblemService.RecomputeAggregatesAsync / SolvedCounters) ──
         foreach (var problem in problems.Values)
             await db.RecomputeProblemSolvedAsync(problem.ID);
 
@@ -360,11 +339,6 @@ public static class DemoDataSeeder
             logger.LogInformation("Added {Count} {What}", count, what);
     }
 
-    // In right-to-left Arabic text the browser's bidi algorithm reorders runs of
-    // numbers and operators, e.g. "(5, 3)" is displayed as "(3 ,5)" and
-    // "100 = 6 · 16 + 4" as "4 + 16 · 6 = 100". Each math run is therefore wrapped
-    // in an invisible left-to-right isolate (U+2066 … U+2069) so it always reads
-    // exactly as written, without any change to the application's rendering code.
     private static readonly Regex NonArabicRun = new(@"[^؀-ۿ\n]+", RegexOptions.Compiled);
     private static readonly Regex MathChar = new(@"[0-9A-Za-z\p{Sm}∠√π²³⁴⁵⁶⁸ⁱⁿℝℤℚ∎·−]", RegexOptions.Compiled);
     private const char Lri = '⁦', Pdi = '⁩';
@@ -384,7 +358,6 @@ public static class DemoDataSeeder
     [return: System.Diagnostics.CodeAnalysis.NotNullIfNotNull(nameof(text))]
     internal static string? BidiOrNull(string? text) => text == null ? null : Bidi(text);
 
-    // An opening bracket stays inside the isolate only if the math it opens follows it.
     private static bool StartsMath(string run, int i) =>
         run[i] == '(' && i + 1 < run.Length && MathChar.IsMatch(run[(i + 1)..(i + 2)]);
 
